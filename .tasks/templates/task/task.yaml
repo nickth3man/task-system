@@ -1,0 +1,127 @@
+schema_version: "1.0.0"
+task_system_version: "1.0.0"
+
+# Replace every template value before beginning the task.
+id: "TASK-0000-000"
+slug: "replace-with-kebab-case"
+title: "Replace with task title"
+type: "feature"
+status: "draft"
+status_reason: null
+created_at: null
+updated_at: null
+
+repository:
+  name: "replace-with-repository-name"
+  default_branch: "main"
+  remote: "origin"
+  provider: "github"
+  issue_url: null
+
+source:
+  kind: "human"
+  reference: null
+
+branch:
+  name: "task/TASK-0000-000-replace-with-kebab-case"
+  base_branch: "main"
+  base_commit: null
+  created_at: null
+  worktree_path: null
+
+revisions:
+  task: 1
+  findings: 0
+  plan: 0
+
+approvals:
+  findings:
+    status: "pending"
+    revision: null
+    head_sha: null
+    approved_by: null
+    approved_at: null
+    source: "chat"
+    evidence: null
+  plan:
+    status: "pending"
+    revision: null
+    head_sha: null
+    approved_by: null
+    approved_at: null
+    source: "chat"
+    evidence: null
+  pull_request:
+    status: "pending"
+    revision: null
+    head_sha: null
+    approved_by: null
+    approved_at: null
+    source: "chat"
+    evidence: null
+  merge:
+    status: "pending"
+    revision: null
+    head_sha: null
+    approved_by: null
+    approved_at: null
+    source: "chat"
+    evidence: null
+
+acceptance_criteria:
+  - id: "AC-01"
+    status: "pending"
+    evidence: []
+
+plan_steps:
+  - id: "PLAN-01"
+    status: "pending"
+    supports:
+      - "AC-01"
+
+state_history: []
+
+git:
+  commits: []
+  pushed: false
+  remote: "origin"
+  head_sha: null
+  pushed_at: null
+
+pull_request:
+  state: "not_created"
+  number: null
+  url: null
+  base_branch: "main"
+  head_branch: "task/TASK-0000-000-replace-with-kebab-case"
+  head_sha: null
+  created_at: null
+  checks:
+    status: "not_started"
+    last_polled_at: null
+    required: []
+    results: []
+
+merge:
+  strategy: "repository_default"
+  commit_sha: null
+  merged_at: null
+  merged_by: null
+
+archive:
+  status: "not_started"
+  path: null
+  archival_pr_url: null
+  archival_merge_sha: null
+  archived_at: null
+
+blocker:
+  is_blocked: false
+  reason: null
+  since: null
+  required_user_decision: null
+
+risks:
+  remaining: []
+  known_failures: []
+  skipped_checks: []
