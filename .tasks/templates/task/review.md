@@ -2,22 +2,31 @@
 
 ## Record
 
-- Task: `TASK-0000-000`
-- Base branch and commit: `[branch @ SHA]`
-- Reviewed head: `[SHA]`
+- Task: `__REQUIRED_TASK_ID__`
+- Base commit: `[SHA]`
+- Reviewed committed head: `[SHA]`
 - Reviewer: Implementing agent
 - Review status: In progress
 
-## Diff reviewed
+## Candidate-state safety
 
-- Command: `[git diff command]`
+- Staged changes after candidate commit: `[None or details]`
+- Unstaged changes after candidate commit: `[None or details]`
+- Untracked files after candidate commit: `[None or details]`
+
+## Committed diff reviewed
+
+- Stat command: `[configured diff_base command]`
+- Full command: `[configured diff_full command]`
 - Files changed: `[count]`
 - Additions/deletions: `[values]`
 
+The review target must be the committed head. Do not use `base...HEAD` while implementation remains uncommitted.
+
 ## Scope conformance
 
-- Does the diff implement only the approved task and plan? `[Yes/No]`
-- Unrelated or accidental changes found: `[None or details]`
+- Implements only the approved task and plan: `[Yes/No]`
+- Unrelated or accidental changes: `[None or details]`
 - Material deviations: `[None or approval reference]`
 
 ## Acceptance-criterion review
@@ -31,16 +40,16 @@
 - Correctness: [Finding]
 - Error handling: [Finding]
 - Maintainability: [Finding]
-- Consistency with repository patterns: [Finding]
+- Repository-pattern consistency: [Finding]
 - Performance: [Finding or Not applicable]
 - Security and privacy: [Finding or Not applicable]
 - Compatibility and migration: [Finding or Not applicable]
 
 ## Tests and validation review
 
-- Coverage of changed behavior: [Finding]
+- Changed-behavior coverage: [Finding]
 - Regression coverage: [Finding]
-- Flakiness or environment risk: [Finding]
+- Flakiness/environment risk: [Finding]
 - Skipped checks: [Finding]
 
 ## Dependencies, generated files, and data changes
@@ -48,7 +57,7 @@
 - Dependency changes: [Finding or Not applicable]
 - Lockfile changes: [Finding or Not applicable]
 - Generated artifacts: [Finding or Not applicable]
-- Database or schema changes: [Finding or Not applicable]
+- Database/schema changes: [Finding or Not applicable]
 
 ## Documentation review
 
@@ -62,6 +71,8 @@
 |---|---|---|---|---|
 | REV-01 | [Critical/High/Medium/Low] | [Finding] | [Fix or rationale] | [Open/Resolved] |
 
+When changes are required, return to `implementing`, then repeat testing, committing, and review for the new head.
+
 ## Remaining risks
 
 - [Risk]
@@ -70,7 +81,7 @@
 
 Choose one:
 
-- Approved for commit and push
+- Approved for push
 - Changes required
 - Blocked
 

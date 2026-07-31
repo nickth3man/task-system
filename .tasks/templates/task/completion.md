@@ -6,29 +6,29 @@ Summarize what was delivered and whether the independently mergeable objective w
 
 ## Task metadata
 
-- Task: `TASK-0000-000 — Replace with task title`
-- Final task-system version: `1.0.0`
-- Final status: `[completed or archived]`
+- Task: `__REQUIRED_TASK_ID__ — __REQUIRED_TASK_TITLE__`
+- Final task-system version: `2.0.0`
+- Implementation status: `completed`
+- Archive status: `[not_started/preparing/pr_open/archived]`
 - Base branch: `[branch]`
 - Task branch: `[branch]`
 - Started: `[timestamp]`
 - Implementation PR merged: `[timestamp]`
-- Archived: `[timestamp]`
 
-## Pull request and merge
+## Implementation pull request and merge
 
 - Implementation PR: `[number and URL]`
 - PR head SHA approved for merge: `[SHA]`
 - Required checks: `[summary]`
-- Merge strategy: `[repository default/squash/merge/rebase]`
-- Merge commit: `[SHA]`
+- Merge strategy: `[repository policy/squash/merge/rebase]`
+- Implementation merge commit: `[SHA]`
 - Merged by: `[actor]`
 
 ## Commits
 
 | SHA | Subject | Purpose |
 |---|---|---|
-| `[SHA]` | `TASK-0000-000: [subject]` | [Purpose] |
+| `[SHA]` | `__REQUIRED_TASK_ID__: [subject]` | [Purpose] |
 
 ## Acceptance criteria
 
@@ -38,7 +38,7 @@ Summarize what was delivered and whether the independently mergeable objective w
 
 ## Implementation summary
 
-Describe the durable technical changes at a level useful to future maintainers.
+Describe durable technical changes for future maintainers.
 
 ## Plan deviations and approvals
 
@@ -85,13 +85,14 @@ If metrics do not apply, explain why.
 
 Preserve important discoveries, decisions, failures, and resolutions from `implementation-log.md`. Remove redundant chronological noise before archival.
 
-## Archive
+## Archive preparation
 
-- Archive path: `.tasks/archive/[YYYY]/[MM]/TASK-0000-000-replace-with-kebab-case/`
+- Archive path: `.tasks/archive/[YYYY]/[MM]/__REQUIRED_TASK_ID__-__REQUIRED_SLUG__/`
+- Authorization: inherited from implementation merge approval for head `[SHA]`
 - Archival PR: `[number and URL]`
+- Archival branch/head SHA: `[branch @ SHA]`
 - Archival PR checks: `[summary]`
-- Archival merge commit: `[SHA]`
 - Temporary evidence removed: `[summary]`
 - Index regenerated: `[Yes/No]`
 
-The archival PR must contain only final metadata, condensed task records, the active-to-archive move, and generated index updates. Any production change requires separate approval.
+The archival record intentionally does not contain the archival PR's own merge SHA or merge timestamp. Presence of this task directory under `.tasks/archive/` on the default branch is authoritative proof that archival completed.

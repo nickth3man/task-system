@@ -2,9 +2,10 @@
 
 ## Record
 
-- Task: `TASK-0000-000`
+- Task: `__REQUIRED_TASK_ID__`
 - Plan revision: `1`
 - Findings revision used: `1`
+- SHA-256: `[computed immediately before approval request]`
 - Approval status: Pending
 
 ## Approved outcome
@@ -13,7 +14,7 @@ Restate the independently mergeable result and acceptance criteria supported by 
 
 ## Prerequisites
 
-- [Required repository state, tool, credential, fixture, decision, or environment]
+- [Repository state, tool, credential, fixture, decision, or environment]
 
 ## Expected files and symbols
 
@@ -86,8 +87,8 @@ Migration or rollback:
 
 ## Commit strategy
 
-1. `TASK-0000-000: [logical commit]`
-2. `TASK-0000-000: [logical commit]`
+1. `__REQUIRED_TASK_ID__: [logical commit]`
+2. `__REQUIRED_TASK_ID__: [logical commit]`
 
 ## Explicit exclusions
 
@@ -95,10 +96,8 @@ Migration or rollback:
 
 ## Material-change triggers
 
-List task-specific discoveries that would require stopping, revising the plan, and obtaining renewed approval.
-
-- [Trigger]
+- [Discovery requiring a revised plan and renewed approval]
 
 ## Approval request
 
-Ask the user to approve this exact plan revision in chat. Do not modify production files until approval is recorded in `task.yaml` and the task branch is created.
+Compute the SHA-256 digest of this exact file, then ask the user to approve the exact plan revision and digest. Record the task and findings revisions this plan depends on. Do not modify production files until approval is recorded and the task branch is created.

@@ -2,7 +2,7 @@
 
 ## Status
 
-- Task: `TASK-0000-000`
+- Task: `__REQUIRED_TASK_ID__`
 - Research state: In progress
 - Research date: `[YYYY-MM-DD]`
 

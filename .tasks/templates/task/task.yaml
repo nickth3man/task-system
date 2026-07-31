@@ -1,19 +1,19 @@
-schema_version: "1.0.0"
-task_system_version: "1.0.0"
+schema_version: "2.0.0"
+task_system_version: "2.0.0"
 
-# Replace every template value before beginning the task.
-id: "TASK-0000-000"
-slug: "replace-with-kebab-case"
-title: "Replace with task title"
+# This template is intentionally invalid until every __REQUIRED_*__ value is replaced.
+id: "__REQUIRED_TASK_ID__"
+slug: "__REQUIRED_SLUG__"
+title: "__REQUIRED_TASK_TITLE__"
 type: "feature"
 status: "draft"
 status_reason: null
-created_at: null
-updated_at: null
+created_at: "__REQUIRED_CREATED_AT__"
+updated_at: "__REQUIRED_UPDATED_AT__"
 
 repository:
-  name: "replace-with-repository-name"
-  default_branch: "main"
+  name: "__REQUIRED_REPOSITORY_NAME__"
+  default_branch: "__REQUIRED_DEFAULT_BRANCH__"
   remote: "origin"
   provider: "github"
   issue_url: null
@@ -22,9 +22,13 @@ source:
   kind: "human"
   reference: null
 
+assessment:
+  base_commit: null
+  assessed_at: null
+
 branch:
-  name: "task/TASK-0000-000-replace-with-kebab-case"
-  base_branch: "main"
+  name: null
+  base_branch: "__REQUIRED_DEFAULT_BRANCH__"
   base_commit: null
   created_at: null
   worktree_path: null
@@ -38,34 +42,50 @@ approvals:
   findings:
     status: "pending"
     revision: null
+    artifact_sha256: null
     head_sha: null
+    task_revision: null
+    findings_revision: null
+    plan_revision: null
     approved_by: null
     approved_at: null
-    source: "chat"
+    source: null
     evidence: null
   plan:
     status: "pending"
     revision: null
+    artifact_sha256: null
     head_sha: null
+    task_revision: null
+    findings_revision: null
+    plan_revision: null
     approved_by: null
     approved_at: null
-    source: "chat"
+    source: null
     evidence: null
   pull_request:
     status: "pending"
     revision: null
+    artifact_sha256: null
     head_sha: null
+    task_revision: null
+    findings_revision: null
+    plan_revision: null
     approved_by: null
     approved_at: null
-    source: "chat"
+    source: null
     evidence: null
   merge:
     status: "pending"
     revision: null
+    artifact_sha256: null
     head_sha: null
+    task_revision: null
+    findings_revision: null
+    plan_revision: null
     approved_by: null
     approved_at: null
-    source: "chat"
+    source: null
     evidence: null
 
 # Keep criterion text in task.md. Track only IDs, status, and evidence here.
@@ -75,11 +95,7 @@ acceptance_criteria:
     evidence: []
 
 # Populate after plan creation. Keep full step text in plan.md.
-plan_steps:
-  - id: "PLAN-01"
-    status: "pending"
-    supports:
-      - "AC-01"
+plan_steps: []
 
 state_history: []
 
@@ -94,8 +110,8 @@ pull_request:
   state: "not_created"
   number: null
   url: null
-  base_branch: "main"
-  head_branch: "task/TASK-0000-000-replace-with-kebab-case"
+  base_branch: "__REQUIRED_DEFAULT_BRANCH__"
+  head_branch: null
   head_sha: null
   created_at: null
   checks:
@@ -105,7 +121,7 @@ pull_request:
     results: []
 
 merge:
-  strategy: "repository_default"
+  strategy: "repository_policy"
   commit_sha: null
   merged_at: null
   merged_by: null
@@ -113,15 +129,27 @@ merge:
 archive:
   status: "not_started"
   path: null
-  archival_pr_url: null
-  archival_merge_sha: null
-  archived_at: null
+  authorization:
+    mode: "not_started"
+    source_approval_head_sha: null
+  pull_request:
+    number: null
+    url: null
+    head_branch: null
+    head_sha: null
+    checks_status: "not_started"
+    prepared_at: null
 
 blocker:
   is_blocked: false
+  entered_from_status: null
   reason: null
   since: null
+  attempted_resolutions: []
   required_user_decision: null
+  resolved_at: null
+  resolution: null
+  resume_status: null
 
 risks:
   remaining: []

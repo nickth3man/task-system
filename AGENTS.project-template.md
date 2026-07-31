@@ -2,23 +2,21 @@
 
 ## Project identity
 
-- Project: `[PROJECT_NAME]`
-- Purpose: `[ONE_SENTENCE_PURPOSE]`
-- Primary language/runtime: `[LANGUAGE_AND_VERSION]`
-- Default branch: `[DEFAULT_BRANCH]`
-- Package/build system: `[PACKAGE_OR_BUILD_SYSTEM]`
+- Project: `__REQUIRED_PROJECT_NAME__`
+- Purpose: `__REQUIRED_ONE_SENTENCE_PURPOSE__`
+- Primary language/runtime: `__REQUIRED_LANGUAGE_AND_VERSION__`
+- Default branch: `__REQUIRED_DEFAULT_BRANCH__`
+- Package/build system: `__REQUIRED_PACKAGE_OR_BUILD_SYSTEM__`
 
 ## Repository architecture
 
-Document the major directories, runtime boundaries, generated code, persistent data, public interfaces, and deployment units.
+Document major directories, runtime boundaries, generated code, persistent data, public interfaces, and deployment units.
 
 ```text
 [DIRECTORY_OR_COMPONENT] — [RESPONSIBILITY]
 ```
 
 ## Required development commands
-
-Agents must discover and preserve the repository's established commands. Replace the placeholders below.
 
 ```text
 Install:     [COMMAND]
@@ -53,32 +51,24 @@ If a command does not apply, state `Not applicable` and explain why.
 
 ## Dependencies and generated artifacts
 
-Describe repository-specific policies for:
-
-- Adding or upgrading dependencies
-- Lockfiles
-- Generated code
-- Database migrations
-- API or schema generation
-- Vendored files
-- Binary assets
+Describe repository-specific policies for dependencies, lockfiles, generated code, database migrations, API/schema generation, vendored files, and binary assets.
 
 ## Git and GitHub conventions
 
 - Follow the task branch and commit rules in `.tasks/AGENTS.md`.
-- Repository-specific merge strategy: `[REPOSITORY_DEFAULT_OR_UNSPECIFIED]`.
+- Repository merge policy: `[POLICY_OR_UNSPECIFIED]`.
 - Required GitHub workflows: `[WORKFLOW_NAMES_OR_DISCOVERY_RULE]`.
 - PR template or labels: `[POLICY_OR_NOT_APPLICABLE]`.
 - Release-note requirement: `[POLICY_OR_NOT_APPLICABLE]`.
 
 ## Task system
 
-All feature, bug-fix, refactor, performance, security, audit, research, documentation, dependency, data, UI/UX, and scaffolding work must use the lifecycle in `.tasks/AGENTS.md` unless `.tasks/config.yaml` contains an explicit repository override.
+All independently mergeable feature, bug-fix, refactor, performance, security, audit, research, documentation, dependency, data, UI/UX, and scaffolding work must use `.tasks/AGENTS.md` unless `.tasks/config.yaml` contains an explicit repository override.
 
 `task.yaml` is authoritative for task state. Task Markdown files provide the human-readable record and evidence. Repository rules in this file and lifecycle rules in `.tasks/AGENTS.md` are both mandatory. If they conflict, stop and ask the user rather than choosing silently.
 
 ## Repository-specific task overrides
 
-List and explain any overrides represented in `.tasks/config.yaml`. Do not place machine-readable override values only in this prose.
+List and explain overrides represented in `.tasks/config.yaml`. Do not place machine-readable override values only in this prose.
 
 - `[OVERRIDE]`: `[RATIONALE]`

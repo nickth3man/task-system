@@ -1,41 +1,27 @@
 # Task Lifecycle Instructions for Agents
 
-These instructions govern all work recorded under `.tasks/`. Repository development rules remain in the root `AGENTS.md`. Both files apply.
+These instructions govern work recorded under `.tasks/`. Repository development rules remain in the root `AGENTS.md`; both files apply.
 
 ## 1. Non-negotiable principles
 
-1. One independently mergeable feature or bug fix equals one task directory.
-2. One agent owns the task from intake through merge and archival.
-3. `task.yaml` is the authoritative state record.
-4. Markdown artifacts preserve reasoning, evidence, decisions, and outcomes without duplicating one another wholesale.
-5. Every required stage is entered. Use `Not applicable` with a reason instead of silently skipping work.
-6. No production source changes occur before plan approval and branch creation.
-7. The agent never silently stashes, discards, overwrites, commits, or incorporates unrelated user work.
-8. User approval in chat is required for findings, plan, PR creation, and merge.
-9. A task is complete only after the implementation PR is merged, final records are written, and the mechanical archival PR is merged.
-10. Do not wait for review comments unless the user explicitly requests that behavior. GitHub workflow checks are the required post-PR gate.
+1. One independently mergeable unit of work equals one task directory.
+2. One agent owns the task from intake through implementation merge and archival preparation.
+3. `task.yaml` is the authoritative machine-readable record.
+4. Markdown artifacts preserve the request, evidence, decisions, implementation history, verification, review, and outcome.
+5. Every normal stage is entered. Use `Not applicable` with a concrete reason rather than silently omitting required analysis.
+6. Production files are not changed before findings approval, plan approval, and branch creation.
+7. The agent never silently stashes, discards, resets, cleans, overwrites, commits, or incorporates unrelated user work.
+8. User approval in chat is required for findings, plan, pull-request creation, and implementation merge.
+9. `completed` means the implementation pull request merged. `archived` means the task record exists under the configured archive path on the default branch.
+10. GitHub workflow checks—not review comments—are the required post-PR gate unless the user explicitly requests review-comment handling.
 
 ## 2. Supported task types
 
-Use the full lifecycle for:
+Use the full lifecycle for features, bug fixes, refactors, performance work, security remediation, audits, research-only work, documentation, dependency changes, data/database changes, UI/UX changes, scaffolding, and other independently mergeable repository work.
 
-- Feature implementation
-- Bug fix
-- Refactor
-- Performance improvement
-- Security remediation
-- Project audit
-- Research-only task
-- Documentation
-- Dependency upgrade
-- Data or database work
-- UI/UX improvement
-- Repository setup or scaffolding
-- Other independently mergeable repository work
+All task types use the same artifact set. Sections that do not apply remain present and state why.
 
-All task types use the same files. A section may be marked `Not applicable` only with a concrete reason.
-
-## 3. Directory and identifier rules
+## 3. Directories, identifiers, and concurrency
 
 Active task path:
 
@@ -49,64 +35,68 @@ Archive path:
 .tasks/archive/YYYY/MM/TASK-YYYY-NNN-kebab-case-slug/
 ```
 
-Identifiers are sequential per repository and year. To allocate an ID:
-
-1. Scan every `task.yaml` under `.tasks/active/` and `.tasks/archive/`.
-2. Find the highest sequence for the current year.
-3. Add one and format it with three digits.
-4. Do not rely only on `.tasks/index.yaml` because it is generated and non-authoritative.
-5. Stop and resolve any duplicate ID before continuing.
-
-Default branch name:
+Branch:
 
 ```text
 task/TASK-YYYY-NNN-kebab-case-slug
 ```
 
-## 4. Required artifacts and ownership
+To allocate an ID:
 
-| Artifact | Sole primary responsibility |
+1. Fetch the latest default branch.
+2. Scan every `task.yaml` under `.tasks/active/` and `.tasks/archive/`.
+3. Scan remote task branches matching the configured branch pattern.
+4. Select the next sequence for the current year.
+5. Create the task directory and immediately recheck for collisions.
+6. On collision, discard only the uncommitted allocation attempt and retry with the next sequence.
+7. Never rely on `.tasks/index.yaml` for allocation.
+
+Multiple active tasks may coexist. A worktree may contain only one pre-branch task. Every implementing task uses its own branch or worktree. Never carry another task's artifacts onto a task branch.
+
+## 4. Required artifacts
+
+| Artifact | Primary responsibility |
 |---|---|
-| `task.yaml` | Machine-readable task state, approvals, revisions, acceptance-status references, Git/PR/merge metadata |
+| `task.yaml` | State, approvals, revisions, acceptance references, Git/PR/merge/archive metadata |
 | `task.md` | Original request, objective, scope, constraints, non-goals, acceptance-criterion text |
-| `assessment.md` | Repository inspection, baseline behavior, files inspected, commands, code locations, constraints, risks |
-| `research.md` | Research questions, external-research evaluation, source-derived notes, applicability |
+| `assessment.md` | Repository inspection, baseline, commands, code locations, assumptions, risks |
+| `research.md` | Research questions, source-derived notes, applicability, uncertainty |
 | `links.md` | External source ledger with stable source IDs |
-| `findings.md` | Conclusions, options, recommendation, rejected alternatives, assumptions, open questions |
-| `plan.md` | Approved implementation approach, ordered steps, validation, risks, rollback or migration considerations |
-| `implementation-log.md` | Append-only consequential implementation record and minor deviations |
-| `verification.md` | Tests, CI checks, metrics, screenshots, failures, skipped checks, acceptance evidence |
-| `review.md` | Same-agent review of the complete diff against scope, plan, criteria, and repository rules |
-| `completion.md` | Final outcome, PR and merge metadata, commits, durable summary, remaining risks, archive record |
+| `findings.md` | Conclusions, options, recommendation, rejected alternatives, open questions |
+| `plan.md` | Approved implementation approach, ordered steps, validation, risks, rollback/migration |
+| `implementation-log.md` | Append-only consequential implementation and correction history |
+| `verification.md` | Acceptance evidence, tests, metrics, screenshots, failures, skipped checks, CI |
+| `review.md` | Review of the committed head against scope, plan, criteria, and repository rules |
+| `completion.md` | Implementation PR outcome, commits, merge, durable history, risks, archive preparation |
 
-Reference other artifacts instead of copying large sections between them.
+Reference other artifacts rather than copying large sections wholesale.
 
-## 5. Authoritative state machine
+## 5. Normal lifecycle and allowed correction loops
 
-Normal states, in order:
+Normal progression:
 
 ```text
 draft
-assessing
-researching
-awaiting_findings_approval
-planning
-awaiting_plan_approval
-approved
-creating_branch
-implementing
-testing
-reviewing
-committing
-pushing
-awaiting_pr_approval
-creating_pr
-waiting_for_ci
-awaiting_merge_approval
-merging
-completing
-completed
-archived
+→ assessing
+→ researching
+→ awaiting_findings_approval
+→ planning
+→ awaiting_plan_approval
+→ approved
+→ creating_branch
+→ implementing
+→ testing
+→ committing
+→ reviewing
+→ pushing
+→ awaiting_pr_approval
+→ creating_pr
+→ waiting_for_ci
+→ awaiting_merge_approval
+→ merging
+→ completing
+→ completed
+→ archived
 ```
 
 Exceptional states:
@@ -118,386 +108,260 @@ cancelled
 superseded
 ```
 
+Allowed correction loops:
+
+```text
+reviewing → implementing → testing → committing → reviewing
+waiting_for_ci → implementing → testing → committing → reviewing → pushing → waiting_for_ci
+```
+
+A correction within approved scope does not require renewed findings, plan, or PR-creation approval. Any changed head invalidates merge approval. A material scope change follows the approval-invalidation process.
+
 For every transition:
 
-1. Update `status` and `updated_at` in `task.yaml`.
-2. Append an entry to `state_history` with timestamp, previous state, next state, actor, and reason.
-3. Update `.tasks/index.yaml` as a derived view when practical.
-4. Do not jump over a normal state. Enter it and document `Not applicable` when necessary.
+1. Update `status`, `status_reason`, and `updated_at`.
+2. Append `state_history` with timestamp, from, to, actor, and reason.
+3. Maintain the task metadata required for the destination state.
+4. Regenerate `.tasks/index.yaml` only with the configured generator.
+5. Never invent a transition that is not normal, exceptional, or an allowed correction loop.
 
-A blocked task records the blocker, the attempted resolution, the date, and the user decision required. Resume from the last valid normal state after the blocker is cleared.
+## 6. Intake
 
-## 6. Intake and task creation
-
-A task may originate from a human request, an agent proposal, a GitHub issue, an audit, or another documented source.
+A task may originate from a human request, agent proposal, GitHub issue, audit, or another documented source.
 
 Before assessment:
 
-1. Create the task directory from `.tasks/templates/task/`.
-2. Replace every template value in `task.yaml`.
-3. Record the source and any issue URL or reference.
-4. Populate `task.md` with the exact request, interpreted objective, scope, constraints, non-goals, and stable acceptance-criterion IDs.
-5. Use stable IDs such as `AC-01`, `AC-02`, and `PLAN-01`.
-6. Record the initial repository status command and result.
+1. Copy `.tasks/templates/task/` into the active task path.
+2. Replace every `__REQUIRED_*__` value.
+3. Record the source and exact request.
+4. Define one independently mergeable objective.
+5. Create observable acceptance criteria with stable IDs such as `AC-01`.
+6. Record the current default branch and initial repository status.
 7. Transition from `draft` to `assessing`.
 
-The original request and approved scope become locked after plan approval. Correct typos and clarify wording without changing meaning. Material scope changes require a revision and renewed approval.
+The task contract becomes locked after plan approval. Material contract changes increment `revisions.task` and invalidate affected approvals.
 
-## 7. Pre-branch work
+## 7. Pre-branch work and worktree safety
 
-Assessment, research, findings, and planning occur before branch creation.
+Assessment, research, findings, and planning occur before branch creation. During this phase:
 
-During pre-branch work:
+- Modify only the current `.tasks/active/<task>/` directory.
+- Task artifacts may be uncommitted; this is permitted.
+- Do not modify production source, tests, project configuration, dependencies, generated artifacts, or documentation outside the task directory.
+- Record the initial `git status --porcelain` result.
+- If unrelated changes exist, stop and ask the user before branch creation.
+- A clean worktree is not required; absence of unrelated changes is required.
 
-- Only modify files inside the current `.tasks/active/<task>/` directory.
-- Do not modify production source, tests, configuration, generated artifacts, dependencies, or documentation outside the task directory.
-- Record the initial `git status --porcelain` output in `assessment.md` or `implementation-log.md`.
-- If unrelated user changes already exist, record them but do not touch them.
-- Before branch creation, verify that every new change belongs to the task directory.
+After plan approval, verify that every uncommitted change belongs to the current task directory, then create the task branch while carrying those task artifacts onto it.
 
-After plan approval, create the task branch while carrying the uncommitted task artifacts onto it.
+## 8. Assessment and base-drift control
 
-## 8. Assessment
+Inspect the repository before proposing a solution. Record files inspected, consequential commands, relevant architecture and data flow, current and expected behavior, reproduction steps, important paths/symbols/line ranges, existing tests, constraints, assumptions, unknowns, and risks.
 
-Transition to `assessing` and inspect the repository before proposing a solution.
+Record the assessed default-branch commit and assessment timestamp in `task.yaml`.
 
-Record:
+Immediately before branch creation:
 
-- Files inspected
-- Consequential repository commands
-- Relevant architecture and data flow
-- Current and expected behavior
-- Reproduction steps for bugs, when applicable
-- Important file paths, symbols, and useful line ranges
-- Existing tests and validation paths
-- Constraints and compatibility requirements
-- Assumptions
-- Known unknowns
-- Initial risks
+1. Fetch the current default branch.
+2. Compare it with `assessment.base_commit`.
+3. Inspect intervening changes relevant to the task.
+4. If relevant behavior, files, APIs, dependencies, or assumptions changed, refresh assessment and invalidate findings or plan approval as necessary.
+5. If changes are irrelevant, record that conclusion and continue.
 
-Do not use external research to replace repository inspection.
+External research never replaces repository inspection.
 
 ## 9. External research
 
-Transition to `researching` after assessment.
+The research stage is mandatory. It may conclude that no external sources are necessary, but `research.md` must state the questions considered and why repository evidence is sufficient; `links.md` then states `Not applicable` with the same rationale.
 
-The research stage is mandatory, but it may conclude that no external sources are necessary. In that case:
+When sources are useful, prefer:
 
-- State the questions considered.
-- Explain why repository evidence and established project behavior are sufficient.
-- Mark `links.md` as `Not applicable` with the rationale.
-
-When external sources are useful, prefer this hierarchy:
-
-1. Repository source code and current repository documentation
+1. Repository source and current repository documentation
 2. Official language, library, framework, API, and platform documentation
 3. Primary specifications, standards, or research
 4. Maintainer repositories, issues, release notes, and migration guides
-5. High-quality secondary technical sources
-6. Forums and informal discussion only as supporting evidence
+5. High-quality secondary sources
+6. Forums only as supporting evidence
 
-For each external source, add a stable ID in `links.md`, such as `SRC-001`, and record authority, access date, relevance, and where it influenced the task. In `research.md`, distinguish source-derived claims from inference.
+Assign each source a stable `SRC-###` ID. Record authority, access date, relevance, and use. Separate sourced facts from inference.
 
-## 10. Findings and findings approval
+## 10. Findings approval
 
-`findings.md` synthesizes assessment and research into:
+`findings.md` contains evidence-backed findings, viable options, recommendation, rejected alternatives, assumptions, risks, and open questions.
 
-- Evidence-backed findings
-- Viable options
-- Recommended direction
-- Rejected alternatives and reasons
-- Assumptions
-- Risks
-- Open questions
+For a material findings change:
 
-Increment `revisions.findings` whenever the findings change materially.
+1. Increment `revisions.findings`.
+2. Compute the SHA-256 digest of the exact `findings.md` bytes.
+3. Transition to `awaiting_findings_approval`.
+4. Ask the user to approve that revision and digest in chat.
+5. Record revision, digest, task revision, approver, timestamp, source, and concise evidence.
 
-Transition to `awaiting_findings_approval` and ask the user to approve the current findings revision in chat. Record:
+Do not start planning before the exact findings artifact is approved. Any later content change invalidates the approval unless it is demonstrably non-material; even non-material edits require recomputing and recording the digest before relying on the approval.
 
-- `status: approved`
-- Approved revision
-- Approver
-- Timestamp
-- `source: chat`
-- Concise evidence of what was approved
+## 11. Plan approval
 
-Do not start planning before findings approval.
+After findings approval, create `plan.md`. Every plan step includes:
 
-## 11. Planning and plan approval
-
-After findings approval, transition to `planning` and create `plan.md`.
-
-Every plan step must include:
-
-- Stable plan ID
+- Stable `PLAN-##` ID
 - Supported acceptance criteria
 - Expected files or symbols
 - Method
-- Validation command or procedure
+- Validation
 - Risks and mitigation
-- Migration or rollback considerations when applicable
+- Rollback or migration considerations when applicable
 
-Also include:
+Also record prerequisites, dependency/schema/generated-file changes, test strategy, documentation updates, logical commit grouping, and exclusions.
 
-- Prerequisites
-- Expected dependency or schema changes
-- Test strategy
-- Documentation updates
-- Commit grouping
-- Explicit exclusions
+For a material plan change:
 
-Increment `revisions.plan` for material plan changes.
+1. Increment `revisions.plan`.
+2. Compute the SHA-256 digest of `plan.md`.
+3. Transition to `awaiting_plan_approval`.
+4. Ask the user to approve that revision and digest in chat.
+5. Record the approved plan revision/digest plus the task and findings revisions it depends on.
 
-Transition to `awaiting_plan_approval` and ask the user to approve the exact plan revision in chat. Record the approval in `task.yaml`. Do not modify production files before plan approval.
+Do not modify production files before plan approval and branch creation.
 
-## 12. Material changes and approval invalidation
+## 12. Material changes
 
-A material change includes any of the following:
+Material changes include new user-visible behavior outside the plan; weakening acceptance criteria; unexpected public API, persistent data, architecture, deployment, migration, compatibility, or security changes; unrelated subsystem expansion; unplanned dependencies; substantial risk/effort increases; or a different independently mergeable outcome.
 
-- Adding user-visible behavior outside the approved plan
-- Removing or weakening an acceptance criterion
-- Unexpectedly changing a public API, persistent data format, architecture, deployment, migration, or security behavior
-- Expanding into unrelated files or subsystems
-- Adding a dependency not anticipated by the approved plan
-- Substantially increasing risk or effort
-- Changing the task's independently mergeable outcome
+On a material change:
 
-For a material change:
-
-1. Stop implementation.
-2. Record the reason and proposed change.
-3. Increment the affected artifact revision.
-4. Mark the affected approval `invalidated`.
+1. Stop.
+2. Record the discovery and proposed change.
+3. Increment affected revisions.
+4. Mark affected approvals `invalidated`.
 5. Return to the appropriate approval state.
-6. Resume only after renewed approval in chat.
+6. Resume only after renewed approval.
 
-Minor implementation details and equivalent technical substitutions are recorded in `implementation-log.md` without renewed approval.
+Minor implementation substitutions remain in `implementation-log.md` and do not require renewed approval.
 
-## 13. Working-tree safety and branch creation
+## 13. Branch creation
 
-After plan approval, transition to `approved`, then `creating_branch`.
+After plan approval:
 
-Before creating the branch:
+1. Transition through `approved` to `creating_branch`.
+2. Recheck base drift.
+3. Run the configured status and untracked-file commands.
+4. Verify all uncommitted changes belong to this task.
+5. Stop and ask if unrelated changes exist.
+6. Create the configured branch.
+7. Record branch name, base branch, base commit, creation time, and optional worktree path.
 
-1. Run the configured status command, normally `git status --porcelain`.
-2. Verify all uncommitted task-system changes belong to the current task directory.
-3. If unrelated uncommitted work exists, stop and ask the user.
-4. Do not stash, discard, reset, clean, overwrite, commit, or absorb unrelated work.
-5. Confirm the base branch and remote.
-6. Create the configured branch name.
-7. Record the base branch, branch name, creation timestamp, and base commit in `task.yaml`.
+## 14. Implementation and testing
 
-## 14. Implementation
+Transition to `implementing` and follow the approved plan plus root `AGENTS.md`.
 
-Transition to `implementing`.
+Keep `implementation-log.md` append-only while active. Record consequential commands, important changes, discoveries, decisions, rejected alternatives, minor deviations, failures/resolutions, and before/after measurements. Do not record every file view or tool call.
 
-Follow the approved plan and root `AGENTS.md`. Keep `implementation-log.md` append-only during active implementation.
+Store only relevant screenshots under `evidence/screenshots/`.
 
-Record only consequential information:
+Transition to `testing` and run applicable formatting, linting, type-checking, unit, integration, end-to-end, build, migration, security, and repository-specific validation commands.
 
-- Commands that establish state, generate files, reproduce problems, or affect decisions
-- Important code changes
-- Discoveries that alter implementation details
-- Minor plan deviations
-- Failures and resolutions
-- Decisions and rejected alternatives
-- Relevant before/after measurements
+`verification.md` maps every acceptance criterion to explicit expected/actual results and evidence. A task cannot reach merge approval with a failed, unverified, or omitted acceptance criterion.
 
-Do not log every file view, navigation command, tool call, or conversational exchange.
+## 15. Commit before review
 
-Store relevant screenshots under:
+After local verification, transition to `committing`. Create logical commits representing the full candidate change. Record SHAs and subjects.
 
-```text
-evidence/screenshots/
-```
+The committed head—not merely the working tree—is the review target. Before review, require:
 
-Commit only screenshots needed to understand or verify the task. Remove temporary screenshots before archival.
-
-## 15. Testing and verification
-
-Transition to `testing`.
-
-Run the repository's relevant formatting, linting, type-checking, unit, integration, end-to-end, build, migration, and security checks. Follow the root `AGENTS.md` and `.tasks/config.yaml`.
-
-`verification.md` must map every acceptance criterion to explicit evidence:
-
-- Status
-- Commands or procedure
-- Expected result
-- Actual result
-- Test names or code locations
-- Metrics
-- Screenshot paths when relevant
-- Commit SHA when available
-- Limitations
-
-Record:
-
-- Test commands and results
-- Before/after metrics
-- GitHub workflow results once the PR exists
-- Known failures
-- Skipped tests and reasons
-- Environment limitations
-
-A task cannot reach merge approval with an acceptance criterion failed, unverified, or silently omitted. Any accepted limitation requires explicit user authorization and a recorded scope or criterion update.
+- No unintended staged changes
+- No unintended unstaged changes
+- No unintended untracked files
+- A recorded head SHA
 
 ## 16. Same-agent review
 
-Transition to `reviewing` after local verification.
+Transition to `reviewing`. Review the committed diff from the recorded base commit to the current head. The configured `diff_base` and `diff_full` commands must compare committed history.
 
-The implementing agent reviews the complete diff against the base branch. Review:
+Review scope, acceptance criteria, plan conformance, unrelated changes, correctness, tests, error handling, security/privacy, performance, compatibility/migrations, dependencies, generated files, documentation, task-artifact accuracy, remaining risks, and skipped checks.
 
-- Approved task and plan
-- Every acceptance criterion
-- Unrelated or accidental changes
-- Repository conventions
-- Tests and coverage
-- Error handling
-- Security and privacy
-- Compatibility and migrations
-- Dependencies and generated files
-- Documentation
-- Task-artifact accuracy
-- Remaining risks and skipped checks
+If changes are required, use the review correction loop. Retest, commit, and review the new committed head. Do not push a head whose review verdict is not approved.
 
-Record findings in `review.md`. Fix review findings before continuing. A separate agent or fresh-context review is not required.
+## 17. Push and PR approval
 
-## 17. Commits and push
+After an approved review, transition to `pushing`, push the branch, and record the exact remote head SHA.
 
-Transition to `committing`.
+Transition to `awaiting_pr_approval` and present the task summary, acceptance status, local validation, review verdict, commits, remaining risks/failures/skips, and head SHA. User approval binds to that SHA and task/plan revisions.
 
-Use multiple logical commits when appropriate. Default commit subject:
+If the head changes before PR creation, invalidate PR approval and ask again.
 
-```text
-TASK-YYYY-NNN: concise imperative summary
-```
+After approval, create the PR, record its metadata, and generate its body from task artifacts.
 
-Do not create temporary failing-work commits merely as checkpoints unless repository policy requires them. Ensure each committed change belongs to the approved task.
+## 18. GitHub workflow checks
 
-Record commit SHAs and subjects in `task.yaml` and `completion.md`.
+Transition to `waiting_for_ci`. Determine checks according to `required_checks_mode`:
 
-Transition to `pushing`, push the task branch, and record the remote and head SHA.
+- `explicit`: require every configured name.
+- `discover`: inspect branch protection and workflow/check results. If none are discoverable, follow `on_no_checks_discovered`; never assume an empty list means success.
+- `none`: permitted only through an explicit repository configuration and rationale.
 
-## 18. Pull-request approval and creation
+Poll at the configured interval until all required checks pass, one fails/cancels, or timeout occurs.
 
-After push, transition to `awaiting_pr_approval`.
+For a failed check, use the CI correction loop: implement, test, commit, review, push, and return to `waiting_for_ci`. Do not request merge approval for an outdated head.
 
-Present the user with:
+On timeout or external blockage, enter `blocked` and record the prior status, attempted resolutions, required decision, and resume status.
 
-- Task ID and title
-- Final scope summary
-- Acceptance-criterion status
-- Local verification summary
-- Review result
-- Commit list
-- Remaining risks, failures, and skipped checks
-- Current branch head SHA
+## 19. Merge approval and implementation completion
 
-Ask for approval to create the pull request. Approval binds to the current head SHA. If the branch changes before PR creation, invalidate the approval and ask again.
+When all required checks pass, transition to `awaiting_merge_approval`. Present the PR, exact head SHA, checks, acceptance status, remaining risks, known failures/skips, and intended merge method.
 
-After approval, transition to `creating_pr` and create the PR.
+Merge approval binds to the exact green head SHA. Any subsequent commit invalidates it.
 
-Generate the PR body from task artifacts with:
+After approval, transition to `merging`. Follow repository policy. When policy permits multiple methods without selecting one, follow `on_ambiguous_repository_policy`; the default fallback is squash.
 
-- Task ID and summary
-- Acceptance-criterion checklist
-- Validation commands
-- Risks and limitations
-- Path to the active task record
+After the implementation PR merges:
 
-Record PR number, URL, base branch, head branch, and head SHA in `task.yaml`.
+1. Record the implementation merge commit and timestamp.
+2. Set the PR state to `merged`.
+3. Transition through `completing` to `completed`.
+4. Treat the independently mergeable task as delivered.
 
-## 19. GitHub workflow checks
+## 20. One-pass archival
 
-Transition to `waiting_for_ci`.
+Prepare one documentation-only archival PR after implementation completion.
 
-Poll GitHub workflow checks using `.tasks/config.yaml`:
+Before opening it:
 
-- Poll interval: configured value
-- Timeout: configured value
-- Required checks: repository policy or discovered branch-protection requirements
+1. Complete `completion.md` with implementation PR and merge metadata.
+2. Condense durable information from `implementation-log.md`.
+3. Remove temporary command dumps, downloaded sources, duplicate notes, and irrelevant screenshots.
+4. Move the directory to the configured archive path.
+5. Set task `status: archived` and `archive.status: archived` in the archival branch. These values become effective when that branch lands on the default branch.
+6. Record archive authorization as inherited from the implementation merge approval.
+7. Regenerate the index.
 
-Do not wait for human or automated review comments unless the user separately requests it.
+Open the archival PR, then record its number, URL, branch, and exact head SHA by committing that metadata to the same archival PR. Wait for required checks and merge it without another user approval. Do not attempt to record the archival PR's own merge commit inside the same archived record; the directory's presence on the default branch is the authoritative proof of archival.
 
-On a failed or cancelled required check:
+If the archival diff contains production changes or non-mechanical scope, stop and request explicit approval.
 
-1. Inspect the failure.
-2. Determine root cause.
-3. Implement the correction.
-4. Run relevant local checks.
-5. Update verification and implementation records.
-6. Commit and push.
-7. Continue polling.
+## 21. Blocked tasks
 
-CI fixes within the approved scope do not require a new PR-creation approval. Material scope changes still require the normal approval process.
+When entering `blocked`, record:
 
-On timeout or an external blocker, transition to `blocked`, record the blocker, and ask the user how to proceed.
+- `entered_from_status`
+- Reason and timestamp
+- Attempted resolutions
+- Required user decision
+- Intended `resume_status`
 
-## 20. Merge approval and merge
+When resolved, record resolution and time, clear `is_blocked`, and transition to the recorded resume state. Never guess the resume point.
 
-When every required GitHub workflow check passes, transition to `awaiting_merge_approval`.
+## 22. Validation and generated index
 
-Present:
+Before commit, before PR creation, after CI corrections, and during archival preparation, run the configured task-system validator.
 
-- PR URL and number
-- Exact current head SHA
-- Required check results
-- Acceptance-criterion status
-- Remaining risks
-- Known failures or skipped checks
-- Intended merge strategy
+The validator must check JSON Schema, semantic lifecycle invariants, approval bindings, unique IDs, plan-to-criterion references, required artifacts, unresolved conflict markers, active/archive consistency, placeholder removal in live records, and index consistency.
 
-Ask the user for merge approval in chat. Approval binds to the exact head SHA and green-check state. Any subsequent commit invalidates merge approval and requires checks plus renewed approval.
+Generate `.tasks/index.yaml` only with the configured generator. It is a navigation aid, not a source of IDs, approvals, or state.
 
-After approval, transition to `merging` and merge using repository policy. If no policy is discoverable, use squash merge. Record the merge commit and timestamp.
+## 23. Missing GitHub or CI capability
 
-## 21. Completion and archival
+The normal standard requires GitHub, a PR, and workflow checks. If the remote, permission, branch-protection visibility, or CI capability is unavailable, stop and ask the user to authorize an alternative. Record that authorization in `task.yaml`, `verification.md`, and `completion.md`.
 
-After the implementation PR merges, transition to `completing`.
+## 24. Configuration conflicts
 
-Update `completion.md` with:
-
-- Final outcome
-- PR URL and number
-- Branch and base branch
-- Commit list
-- Workflow-check results
-- Merge strategy, commit, and timestamp
-- Acceptance-criterion summary
-- Implementation summary
-- Material deviations and approvals
-- Tests and before/after metrics
-- Relevant screenshot paths
-- Remaining risks
-- Known failures and skipped checks
-- Follow-up work explicitly outside scope
-
-Condense durable information from `implementation-log.md` into `completion.md`. Remove temporary command dumps, downloaded sources, duplicate notes, and irrelevant screenshots.
-
-Set the task to `completed`, move it to the configured dated archive path, and update the path in `task.yaml`.
-
-Create a documentation-only archival branch and PR containing only:
-
-- Final metadata updates
-- Condensed task records
-- The move from active to archive
-- Derived index updates
-
-The original merge approval authorizes this mechanical archival PR. Wait for required checks and merge it without another user approval. If the archival diff contains production changes or non-mechanical scope, stop and request explicit approval.
-
-After the archival PR merges, set the final state to `archived` and record the archival PR and merge metadata. If branch protection prevents the final state from being recorded without another PR, record `archived` in the archival PR before merge and include the expected archival merge metadata where exact values are not yet available; update through the repository's normal documentation process only when required.
-
-## 22. Research-only and audit tasks
-
-Research-only and audit tasks still follow the full lifecycle. Their implementation may consist of adding or updating approved repository artifacts rather than production code. Mark code-specific sections `Not applicable` with reasons. They still require branch creation, validation, review, commits, push, PR approval, GitHub checks, merge approval, merge, completion, and archive.
-
-## 23. Missing GitHub remote or CI
-
-The normal standard requires GitHub, workflow checks, and a PR. If the repository lacks a GitHub remote, permissions, branch protection visibility, or CI workflows, stop and ask the user how to proceed. Do not silently reinterpret the lifecycle. Record the user-authorized alternative in `task.yaml`, `verification.md`, and `completion.md`.
-
-## 24. Configuration and overrides
-
-`.tasks/config.yaml` contains machine-readable repository policy. The root `AGENTS.md` explains project-specific rules. Valid overrides must be explicit in configuration and documented in prose.
-
-If configuration, root instructions, repository behavior, and these lifecycle instructions conflict, stop and ask the user. Do not silently choose the most convenient rule.
+`.tasks/config.yaml` is machine-readable policy. Root `AGENTS.md` describes project-specific development rules. If configuration, schemas, repository behavior, root instructions, and this lifecycle disagree, stop and resolve the conflict rather than silently choosing a convenient interpretation.
