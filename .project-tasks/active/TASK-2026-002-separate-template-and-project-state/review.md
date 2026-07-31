@@ -2,8 +2,8 @@
 
 - Task: `TASK-2026-002`
 - Base commit: `8b2ed41390840f57ad7cf15aa80d73435d454f29`
-- Reviewed candidate head: Pending first implementation commit
-- Status: Local content review passed; committed-head review pending
+- Reviewed candidate head: `ab166a02be48109a18ea5623681e8748a7d7ff74`
+- Status: Passed against committed candidate head
 
 ## Scope and acceptance review
 
@@ -21,4 +21,4 @@
 
 ## Verdict
 
-- Approved for the first implementation commit; repeat review against the committed head before PR creation.
+- Approved for push and pull request creation.

@@ -1,79 +1,78 @@
-schema_version: "3.0.0"
-task_system_version: "3.0.0"
-id: "TASK-2026-002"
-slug: "separate-template-and-project-state"
-title: "Separate distributable template from project task state"
-type: "refactor"
-status: "reviewing"
-status_reason: "Implementation and local validation complete; committed-head review pending"
-created_at: "2026-07-31T18:34:00-04:00"
-updated_at: "2026-07-31T18:45:00-04:00"
-
+schema_version: 3.0.0
+task_system_version: 3.0.0
+id: TASK-2026-002
+slug: separate-template-and-project-state
+title: Separate distributable template from project task state
+type: refactor
+status: awaiting_merge_approval
+status_reason: Implementation PR is open and the required GitHub workflow passed;
+  awaiting user merge approval
+created_at: '2026-07-31T18:34:00-04:00'
+updated_at: '2026-07-31T18:49:00-04:00'
 repository:
-  name: "task-system"
-  default_branch: "main"
-  remote: "origin"
-  provider: "github"
+  name: task-system
+  default_branch: main
+  remote: origin
+  provider: github
   issue_url: null
-
 source:
-  kind: "human"
-  reference: "User requested that .tasks remain a copy-and-pasteable template while the repository governs itself separately."
-
+  kind: human
+  reference: User requested that .tasks remain a copy-and-pasteable template while
+    the repository governs itself separately.
 assessment:
-  base_commit: "8b2ed41390840f57ad7cf15aa80d73435d454f29"
-  assessed_at: "2026-07-31T18:36:00-04:00"
-  base_drift_checked_at: "2026-07-31T18:38:00-04:00"
-  base_drift_result: "No drift; task branch was created from the assessed main commit."
-
+  base_commit: 8b2ed41390840f57ad7cf15aa80d73435d454f29
+  assessed_at: '2026-07-31T18:36:00-04:00'
+  base_drift_checked_at: '2026-07-31T18:38:00-04:00'
+  base_drift_result: No drift; task branch was created from the assessed main commit.
 branch:
-  name: "task/TASK-2026-002-separate-template-and-project-state"
-  base_branch: "main"
-  base_commit: "8b2ed41390840f57ad7cf15aa80d73435d454f29"
-  created_at: "2026-07-31T18:35:00-04:00"
+  name: task/TASK-2026-002-separate-template-and-project-state
+  base_branch: main
+  base_commit: 8b2ed41390840f57ad7cf15aa80d73435d454f29
+  created_at: '2026-07-31T18:35:00-04:00'
   worktree_path: null
-
 revisions:
   task: 1
   findings: 1
   plan: 1
-
 approvals:
   findings:
-    status: "approved"
+    status: approved
     revision: 1
-    artifact_sha256: "116c3b7b5d5af2d6f2b02a6448f77581be5a50f640fd0770f5d8febff7a7c3a2"
+    artifact_sha256: 116c3b7b5d5af2d6f2b02a6448f77581be5a50f640fd0770f5d8febff7a7c3a2
     task_revision: 1
     findings_revision: 1
     head_sha: null
-    approved_by: "user"
-    approved_at: "2026-07-31T18:34:00-04:00"
-    source: "chat"
-    evidence: "User approved the recommended two-root architecture and instructed the agent to create the implementation plan and update GitHub."
+    approved_by: user
+    approved_at: '2026-07-31T18:34:00-04:00'
+    source: chat
+    evidence: User approved the recommended two-root architecture and instructed the
+      agent to create the implementation plan and update GitHub.
   plan:
-    status: "approved"
+    status: approved
     revision: 1
-    artifact_sha256: "723b3bfe51afe3d4625fa8fc50f573d1348fcf24d94adb9d3125c270dc839200"
+    artifact_sha256: 723b3bfe51afe3d4625fa8fc50f573d1348fcf24d94adb9d3125c270dc839200
     task_revision: 1
     findings_revision: 1
     head_sha: null
-    approved_by: "user"
-    approved_at: "2026-07-31T18:34:00-04:00"
-    source: "chat"
-    evidence: "The instruction to create the implementation plan and then update GitHub authorizes implementation of the stated plan."
+    approved_by: user
+    approved_at: '2026-07-31T18:34:00-04:00'
+    source: chat
+    evidence: The instruction to create the implementation plan and then update GitHub
+      authorizes implementation of the stated plan.
   pull_request:
-    status: "pending"
+    status: approved
     revision: null
     artifact_sha256: null
-    task_revision: null
-    findings_revision: null
-    head_sha: null
-    approved_by: null
-    approved_at: null
-    source: "chat"
-    evidence: null
+    task_revision: 1
+    findings_revision: 1
+    head_sha: ab166a02be48109a18ea5623681e8748a7d7ff74
+    approved_by: user
+    approved_at: '2026-07-31T18:34:00-04:00'
+    source: chat
+    evidence: User instructed the agent to create the implementation plan and update
+      GitHub, authorizing PR creation for the approved plan.
   merge:
-    status: "pending"
+    status: pending
     revision: null
     artifact_sha256: null
     task_revision: null
@@ -81,143 +80,185 @@ approvals:
     head_sha: null
     approved_by: null
     approved_at: null
-    source: "chat"
+    source: chat
     evidence: null
-
 acceptance_criteria:
-  - id: "AC-01"
-    status: "passed"
-    evidence: [".tasks/config.yaml is generic", ".tasks contains bundled scripts, requirements, schemas, templates, and empty live-state directories"]
-  - id: "AC-02"
-    status: "passed"
-    evidence: [".project-tasks/config.yaml", "AGENTS.md", ".project-tasks/active/TASK-2026-002-separate-template-and-project-state"]
-  - id: "AC-03"
-    status: "passed"
-    evidence: [".tasks/scripts/validate.py accepts --template-root and --instance-root", ".tasks/scripts/generate_index.py accepts --instance-root"]
-  - id: "AC-04"
-    status: "pending"
-    evidence: [".github/workflows/validate.yml added; GitHub result pending"]
-  - id: "AC-05"
-    status: "passed"
-    evidence: ["README.md", ".tasks/README.md", ".tasks/templates/AGENTS.md", ".tasks/templates/github/workflows/validate-task-system.yml"]
-
+- id: AC-01
+  status: passed
+  evidence:
+  - .tasks/config.yaml is generic
+  - .tasks contains bundled scripts, requirements, schemas, templates, and empty live-state
+    directories
+- id: AC-02
+  status: passed
+  evidence:
+  - .project-tasks/config.yaml
+  - AGENTS.md
+  - .project-tasks/active/TASK-2026-002-separate-template-and-project-state
+- id: AC-03
+  status: passed
+  evidence:
+  - .tasks/scripts/validate.py accepts --template-root and --instance-root
+  - .tasks/scripts/generate_index.py accepts --instance-root
+- id: AC-04
+  status: passed
+  evidence:
+  - 'GitHub Actions workflow Validate task system run 30670947117 passed on PR #2'
+- id: AC-05
+  status: passed
+  evidence:
+  - README.md
+  - .tasks/README.md
+  - .tasks/templates/AGENTS.md
+  - .tasks/templates/github/workflows/validate-task-system.yml
 plan_steps:
-  - id: "PLAN-01"
-    status: "completed"
-    supports: ["AC-01", "AC-05"]
-  - id: "PLAN-02"
-    status: "completed"
-    supports: ["AC-02"]
-  - id: "PLAN-03"
-    status: "completed"
-    supports: ["AC-03"]
-  - id: "PLAN-04"
-    status: "in_progress"
-    supports: ["AC-04", "AC-05"]
-
+- id: PLAN-01
+  status: completed
+  supports:
+  - AC-01
+  - AC-05
+- id: PLAN-02
+  status: completed
+  supports:
+  - AC-02
+- id: PLAN-03
+  status: completed
+  supports:
+  - AC-03
+- id: PLAN-04
+  status: completed
+  supports:
+  - AC-04
+  - AC-05
 state_history:
-  - at: "2026-07-31T18:34:00-04:00"
-    from: null
-    to: "draft"
-    actor: "agent"
-    reason: "Bootstrap task initialized"
-  - at: "2026-07-31T18:35:00-04:00"
-    from: "draft"
-    to: "assessing"
-    actor: "agent"
-    reason: "Repository architecture inspected"
-  - at: "2026-07-31T18:36:00-04:00"
-    from: "assessing"
-    to: "researching"
-    actor: "agent"
-    reason: "External-research need evaluated"
-  - at: "2026-07-31T18:37:00-04:00"
-    from: "researching"
-    to: "awaiting_findings_approval"
-    actor: "agent"
-    reason: "Two-root findings prepared"
-  - at: "2026-07-31T18:37:30-04:00"
-    from: "awaiting_findings_approval"
-    to: "planning"
-    actor: "agent"
-    reason: "User approved the recommended architecture"
-  - at: "2026-07-31T18:38:00-04:00"
-    from: "planning"
-    to: "awaiting_plan_approval"
-    actor: "agent"
-    reason: "Implementation plan created"
-  - at: "2026-07-31T18:38:30-04:00"
-    from: "awaiting_plan_approval"
-    to: "approved"
-    actor: "agent"
-    reason: "User instructed the agent to execute the plan on GitHub"
-  - at: "2026-07-31T18:39:00-04:00"
-    from: "approved"
-    to: "creating_branch"
-    actor: "agent"
-    reason: "Task branch created from assessed main commit"
-  - at: "2026-07-31T18:40:00-04:00"
-    from: "creating_branch"
-    to: "implementing"
-    actor: "agent"
-    reason: "Template/live-state separation implemented"
-  - at: "2026-07-31T18:43:00-04:00"
-    from: "implementing"
-    to: "testing"
-    actor: "agent"
-    reason: "Local validation started"
-  - at: "2026-07-31T18:44:00-04:00"
-    from: "testing"
-    to: "committing"
-    actor: "agent"
-    reason: "Local validation passed"
-  - at: "2026-07-31T18:45:00-04:00"
-    from: "committing"
-    to: "reviewing"
-    actor: "agent"
-    reason: "Candidate prepared for committed-head review"
-
+- at: '2026-07-31T18:34:00-04:00'
+  from: null
+  to: draft
+  actor: agent
+  reason: Bootstrap task initialized
+- at: '2026-07-31T18:35:00-04:00'
+  from: draft
+  to: assessing
+  actor: agent
+  reason: Repository architecture inspected
+- at: '2026-07-31T18:36:00-04:00'
+  from: assessing
+  to: researching
+  actor: agent
+  reason: External-research need evaluated
+- at: '2026-07-31T18:37:00-04:00'
+  from: researching
+  to: awaiting_findings_approval
+  actor: agent
+  reason: Two-root findings prepared
+- at: '2026-07-31T18:37:30-04:00'
+  from: awaiting_findings_approval
+  to: planning
+  actor: agent
+  reason: User approved the recommended architecture
+- at: '2026-07-31T18:38:00-04:00'
+  from: planning
+  to: awaiting_plan_approval
+  actor: agent
+  reason: Implementation plan created
+- at: '2026-07-31T18:38:30-04:00'
+  from: awaiting_plan_approval
+  to: approved
+  actor: agent
+  reason: User instructed the agent to execute the plan on GitHub
+- at: '2026-07-31T18:39:00-04:00'
+  from: approved
+  to: creating_branch
+  actor: agent
+  reason: Task branch created from assessed main commit
+- at: '2026-07-31T18:40:00-04:00'
+  from: creating_branch
+  to: implementing
+  actor: agent
+  reason: Template/live-state separation implemented
+- at: '2026-07-31T18:43:00-04:00'
+  from: implementing
+  to: testing
+  actor: agent
+  reason: Local validation started
+- at: '2026-07-31T18:44:00-04:00'
+  from: testing
+  to: committing
+  actor: agent
+  reason: Local validation passed
+- at: '2026-07-31T18:45:00-04:00'
+  from: committing
+  to: reviewing
+  actor: agent
+  reason: Candidate prepared for committed-head review
+- at: '2026-07-31T18:45:10-04:00'
+  from: reviewing
+  to: pushing
+  actor: agent
+  reason: Committed-head review passed and candidate branch was pushed
+- at: '2026-07-31T18:45:20-04:00'
+  from: pushing
+  to: awaiting_pr_approval
+  actor: agent
+  reason: Candidate head prepared for pull request
+- at: '2026-07-31T18:45:30-04:00'
+  from: awaiting_pr_approval
+  to: creating_pr
+  actor: agent
+  reason: User instruction authorized GitHub update and PR creation
+- at: '2026-07-31T18:45:48-04:00'
+  from: creating_pr
+  to: waiting_for_ci
+  actor: agent
+  reason: 'Pull request #2 opened'
+- at: '2026-07-31T18:49:00-04:00'
+  from: waiting_for_ci
+  to: awaiting_merge_approval
+  actor: agent
+  reason: Required GitHub workflow passed
 git:
-  commits: []
-  pushed: false
-  remote: "origin"
-  candidate_head_sha: null
-  head_sha: null
-  pushed_at: null
-
+  commits:
+  - sha: ab166a02be48109a18ea5623681e8748a7d7ff74
+    subject: 'TASK-2026-002: separate template and live task state'
+  pushed: true
+  remote: origin
+  candidate_head_sha: ab166a02be48109a18ea5623681e8748a7d7ff74
+  head_sha: ab166a02be48109a18ea5623681e8748a7d7ff74
+  pushed_at: '2026-07-31T18:45:00-04:00'
 pull_request:
-  state: "not_created"
-  number: null
-  url: null
-  base_branch: "main"
-  head_branch: "task/TASK-2026-002-separate-template-and-project-state"
-  head_sha: null
-  created_at: null
+  state: open
+  number: 2
+  url: https://github.com/nickth3man/task-system/pull/2
+  base_branch: main
+  head_branch: task/TASK-2026-002-separate-template-and-project-state
+  head_sha: ab166a02be48109a18ea5623681e8748a7d7ff74
+  created_at: '2026-07-31T22:45:48Z'
   checks:
-    status: "not_started"
-    last_polled_at: null
-    required: ["Validate task system"]
-    results: []
-
+    status: passed
+    last_polled_at: '2026-07-31T18:49:00-04:00'
+    required:
+    - Validate task system
+    results:
+    - name: Validate task system
+      status: passed
+      url: https://github.com/nickth3man/task-system/actions/runs/30670947117
 merge:
-  strategy: "repository_policy"
+  strategy: repository_policy
   commit_sha: null
   merged_at: null
   merged_by: null
-
 archive:
-  status: "not_started"
+  status: not_started
   path: null
   authorization:
-    mode: "inherited"
-    inherited_from: "implementation_merge_approval"
+    mode: inherited
+    inherited_from: implementation_merge_approval
   pull_request:
     number: null
     url: null
     head_branch: null
     head_sha: null
-    checks_status: "not_started"
-
+    checks_status: not_started
 blocker:
   is_blocked: false
   entered_from_status: null
@@ -228,8 +269,9 @@ blocker:
   resolved_at: null
   resolution: null
   resume_status: null
-
 risks:
-  remaining: ["Existing v1/v2 installations require explicit migration; they are not automatically updated."]
+  remaining:
+  - Existing v1/v2 installations require explicit migration; they are not automatically
+    updated.
   known_failures: []
   skipped_checks: []

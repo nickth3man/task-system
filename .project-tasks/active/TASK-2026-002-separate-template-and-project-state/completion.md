@@ -6,16 +6,16 @@ Pending implementation PR merge.
 
 ## Pull request and merge
 
-- Implementation PR: Pending
+- Implementation PR: [#2](https://github.com/nickth3man/task-system/pull/2)
 - Merge commit: Pending
-- Required checks: `Validate task system` pending
+- Required checks: `Validate task system` passed (run `30670947117`)
 
 ## Acceptance criteria
 
 - AC-01: Passed locally
 - AC-02: Passed locally
 - AC-03: Passed locally
-- AC-04: Pending GitHub Actions
+- AC-04: Passed
 - AC-05: Passed locally
 
 ## Durable implementation summary

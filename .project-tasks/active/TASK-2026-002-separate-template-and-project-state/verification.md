@@ -19,8 +19,8 @@
 
 ## AC-04 — CI enforcement
 
-- Status: Pending
-- Evidence: `.github/workflows/validate.yml` is configured; PR workflow result pending.
+- Status: Passed
+- Evidence: GitHub Actions run `30670947117` completed successfully for PR #2.
 
 ## AC-05 — Clear installation path
 
@@ -42,4 +42,4 @@
 
 ## Skipped checks
 
-- GitHub workflow result pending until PR creation.
+- None.
