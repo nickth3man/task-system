@@ -76,6 +76,7 @@ NORMAL_TRANSITIONS = {
 }
 CORRECTION_TRANSITIONS = {
     ('reviewing', 'implementing'),
+    ('pushing', 'waiting_for_ci'),
     ('waiting_for_ci', 'implementing'),
     ('awaiting_merge_approval', 'implementing'),
 }
