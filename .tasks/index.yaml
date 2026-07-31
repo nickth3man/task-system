@@ -1,0 +1,12 @@
+# GENERATED VIEW ONLY.
+# The authoritative state for each task is its own task.yaml.
+# Regenerate this file by scanning .tasks/active and .tasks/archive.
+
+schema_version: "1.0.0"
+task_system_version: "1.0.0"
+generated_at: null
+
+active: []
+archived: []
+
+next_sequence_by_year: {}
