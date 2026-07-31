@@ -1,0 +1,123 @@
+schema_version: "1.0.0"
+task_system_version: "1.0.0"
+
+timezone: "UTC"
+
+repository:
+  name: "replace-with-repository-name"
+  default_branch: "main"
+  remote: "origin"
+  provider: "github"
+
+paths:
+  active: ".tasks/active"
+  archive: ".tasks/archive"
+  template: ".tasks/templates/task"
+  index: ".tasks/index.yaml"
+
+identifiers:
+  prefix: "TASK"
+  scope: "repository"
+  sequence_width: 3
+  allocation: "scan_active_and_archive"
+  format: "{prefix}-{year}-{sequence}"
+
+lifecycle:
+  full_profile_required: true
+  allow_not_applicable_with_reason: true
+  one_agent_owns_lifecycle: true
+  required_approvals:
+    - "findings"
+    - "plan"
+    - "pull_request"
+    - "merge"
+  approval_source: "chat"
+  material_changes_invalidate_approval: true
+
+research:
+  stage_required: true
+  allow_no_external_sources_with_rationale: true
+  preferred_source_order:
+    - "repository_source_and_current_docs"
+    - "official_documentation"
+    - "primary_specifications_and_research"
+    - "maintainer_repositories_issues_and_release_notes"
+    - "high_quality_secondary_sources"
+    - "forums_as_supporting_evidence_only"
+
+commands:
+  status: "git status --porcelain"
+  diff_base: "git diff --stat {base_branch}...HEAD"
+  diff_full: "git diff {base_branch}...HEAD"
+  format: null
+  lint: null
+  typecheck: null
+  unit_test: null
+  integration_test: null
+  end_to_end_test: null
+  build: null
+
+artifacts:
+  require_all_template_files: true
+  implementation_log_append_only_while_active: true
+  screenshots_directory: "evidence/screenshots"
+  commit_only_relevant_screenshots: true
+  condense_log_before_archive: true
+  remove_temporary_evidence_before_archive: true
+
+acceptance_criteria:
+  require_stable_ids: true
+  id_prefix: "AC"
+  require_explicit_verification: true
+  allow_failed_at_merge: false
+  allow_unverified_at_merge: false
+
+plan:
+  require_stable_ids: true
+  id_prefix: "PLAN"
+  require_files_or_symbols: true
+  require_validation: true
+  require_risks: true
+  require_rollback_or_migration_when_applicable: true
+
+git:
+  branch_pattern: "task/{id}-{slug}"
+  require_clean_worktree_before_branch: true
+  on_unrelated_uncommitted_changes: "stop_and_ask"
+  allow_automatic_stash: false
+  commit_policy: "logical_incremental"
+  commit_subject_pattern: "{id}: {summary}"
+  push_before_pr_approval: true
+
+github:
+  enabled: true
+  ci_poll_interval_seconds: 30
+  ci_timeout_minutes: 90
+  wait_for_review_comments: false
+  required_checks: []
+  merge_strategy: "repository_default"
+  fallback_merge_strategy: "squash"
+  archival_pr_required: true
+  archival_pr_requires_additional_user_approval: false
+
+archive:
+  path_pattern: ".tasks/archive/{year}/{month}/{id}-{slug}"
+  preserve:
+    - "task.yaml"
+    - "task.md"
+    - "assessment.md"
+    - "research.md"
+    - "links.md"
+    - "findings.md"
+    - "plan.md"
+    - "verification.md"
+    - "review.md"
+    - "completion.md"
+  condense_or_remove:
+    - "implementation-log.md"
+    - "raw_command_output"
+    - "downloaded_research_material"
+    - "temporary_screenshots"
+    - "duplicate_notes"
+
+overrides: {}
