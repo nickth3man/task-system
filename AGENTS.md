@@ -3,61 +3,64 @@
 ## Project identity
 
 - Project: `task-system`
-- Purpose: Maintain the reusable cross-project task lifecycle, schemas, templates, validation scripts, and installation guidance.
-- Primary runtime: Python 3.11 or newer for validation tooling.
+- Purpose: Maintain the reusable cross-project task lifecycle, templates, schemas, validation tools, and installation guidance.
+- Primary runtime: Python 3.11 or newer.
 - Default branch: `main`
-- Package management: `requirements-dev.txt`
 
 ## Repository architecture
 
 ```text
-.tasks/AGENTS.md                  — lifecycle rules installed into projects
-.tasks/config.yaml                — live configuration for this repository
-.tasks/templates/config.yaml      — consumer configuration template
-.tasks/templates/task/            — task artifact templates
-.tasks/schemas/                    — JSON Schemas for configuration and task records
-scripts/validate.py               — structural and semantic validator
-scripts/generate_index.py         — deterministic task index generator
-AGENTS.project-template.md        — root AGENTS.md template for adopting projects
-README.md                         — installation and operating guide
+.tasks/                          — distributable product; copy this directory into other projects
+.tasks/AGENTS.md                 — generic lifecycle rules installed with the product
+.tasks/config.yaml               — generic, uninitialized consumer configuration
+.tasks/scripts/                  — bundled validator and index generator
+.tasks/schemas/                  — bundled JSON Schemas
+.tasks/templates/                — task, root AGENTS.md, and GitHub workflow templates
+.project-tasks/                  — live task instance for developing this repository
+.project-tasks/config.yaml       — repository-specific live configuration
+.project-tasks/active/           — active source-repository task records
+.project-tasks/archive/          — archived source-repository task records
+README.md                        — product and source-repository documentation
 ```
 
-## Required development commands
+## Non-negotiable product/live boundary
+
+- `.tasks/` is the copy-and-pasteable task-system product.
+- Never create live task records under `.tasks/active/` or `.tasks/archive/` in this repository.
+- Never initialize `.tasks/config.yaml` with `task-system` repository values.
+- All changes to this repository, including changes inside `.tasks/`, are governed by the live instance in `.project-tasks/`.
+- Create new tasks from `.tasks/templates/task/` but store them under the active path configured by `.project-tasks/config.yaml`.
+
+## Required commands
 
 ```text
-Install:        python -m pip install -r requirements-dev.txt
-Validate:       python scripts/validate.py
-Generate index: python scripts/generate_index.py
-Check index:    python scripts/generate_index.py --check
+Install validation dependencies:
+python -m pip install -r .tasks/requirements.txt
+
+Generate live index:
+python .tasks/scripts/generate_index.py --instance-root .project-tasks
+
+Check live index:
+python .tasks/scripts/generate_index.py --instance-root .project-tasks --check
+
+Validate template and live instance:
+python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks
 ```
 
-Formatting, linting, type-checking, unit tests, integration tests, end-to-end tests, and builds are not currently separate commands. `scripts/validate.py` is the required repository check.
+## Development rules
 
-## Coding and documentation conventions
+- Follow `.tasks/AGENTS.md`, using `.project-tasks/config.yaml` as the live configuration.
+- Keep generic product behavior in `.tasks/`; keep repository-specific state in `.project-tasks/` and this root file.
+- Update template documentation, schemas, scripts, examples, and validation together when behavior changes.
+- Treat required lifecycle, schema, layout, or installation changes as major task-system versions.
+- Keep `.project-tasks/index.yaml` generated and deterministic.
+- Add semantic validation for rules JSON Schema cannot enforce.
+- Do not weaken approval, CI, evidence, or merge gates merely to make records validate.
 
-- Keep the Markdown instructions, YAML templates, JSON Schemas, validators, and README behaviorally consistent.
-- Treat lifecycle, required-schema, or required-artifact changes as major task-system versions.
-- Treat new optional fields as minor versions and compatible wording corrections as patch versions.
-- Update `.tasks/VERSION`, live configuration, templates, schemas, README, and validation expectations together when versioning changes.
-- Keep generated `.tasks/index.yaml` deterministic; update it only with `scripts/generate_index.py`.
-- Add semantic validation for rules that JSON Schema cannot express reliably.
-- Use stable public schema identifiers under this repository rather than placeholder domains.
-
-## Repository safety
-
-- Follow `.tasks/AGENTS.md` for repository changes after the v2 bootstrap.
-- Never modify or absorb unrelated work.
-- Never weaken approval, CI, merge, or evidence requirements merely to make a record validate.
-- Do not introduce destructive Git operations into templates or agent instructions.
-- Preserve backward-compatibility guidance when a new major version changes existing task records.
-
-## Git and GitHub conventions
+## Git and GitHub
 
 - Task branches use `task/TASK-YYYY-NNN-kebab-case-slug`.
-- Commits use `TASK-YYYY-NNN: concise imperative summary` when associated with a task.
-- Pull requests must pass the `Validate task system` workflow.
-- Follow repository policy for merge method; use squash when the policy is ambiguous.
-
-## Task system
-
-All independently mergeable changes to this repository use `.tasks/AGENTS.md`. `task.yaml` is authoritative for state; Markdown artifacts preserve evidence. If root instructions, lifecycle instructions, configuration, and repository behavior conflict, stop and resolve the conflict rather than choosing silently.
+- Task commits use `TASK-YYYY-NNN: concise imperative summary`.
+- Pull requests must pass `Validate task system`.
+- The user approves findings, plan, PR creation, and implementation merge in chat.
+- Use the repository's merge policy; use squash when multiple allowed methods are otherwise ambiguous.
