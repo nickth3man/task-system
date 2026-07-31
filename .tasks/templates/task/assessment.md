@@ -2,11 +2,14 @@
 
 ## Status
 
-- Task: `TASK-0000-000`
+- Task: `__REQUIRED_TASK_ID__`
 - Assessment state: In progress
-- Repository base branch: `[branch]`
-- Initial commit: `[SHA]`
+- Repository default branch: `[branch]`
+- Assessed base commit: `[SHA]`
+- Assessment timestamp: `[ISO-8601 timestamp]`
 - Initial working-tree status: `[clean or summarized changes]`
+
+Record the base commit and timestamp in `task.yaml` under `assessment`.
 
 ## Assessment objective
 
@@ -14,7 +17,7 @@ Explain what must be understood before selecting an implementation approach.
 
 ## Repository baseline
 
-Summarize the relevant architecture, runtime boundaries, data flow, and current behavior.
+Summarize relevant architecture, runtime boundaries, data flow, and current behavior.
 
 ## Files inspected
 
@@ -32,11 +35,11 @@ Record consequential commands only.
 
 ## Current behavior
 
-Describe the observed current state. For bugs, include reproducible steps and actual results.
+Describe the observed current state. For bugs, include reproduction steps and actual results.
 
 ## Expected behavior
 
-Describe the task's intended outcome without selecting an implementation prematurely.
+Describe the intended outcome without choosing an implementation prematurely.
 
 ## Important code locations
 
@@ -64,8 +67,17 @@ Describe the task's intended outcome without selecting an implementation prematu
 
 ## Unknowns and questions
 
-- [Unknown that research or findings must resolve]
+- [Unknown research or findings must resolve]
+
+## Base-drift recheck
+
+Complete immediately before branch creation.
+
+- Current default-branch commit: `[SHA]`
+- Changes since assessed commit: `[summary or None]`
+- Task-relevant drift: `[Yes/No]`
+- Action: `[Continue / refresh assessment / invalidate approval]`
 
 ## Not applicable sections
 
-List any standard assessment area that does not apply and explain why. Do not silently omit it.
+List any standard assessment area that does not apply and explain why.

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/task-system/config.schema.json",
+  "$id": "https://raw.githubusercontent.com/nickth3man/task-system/main/.tasks/schemas/config.schema.json",
   "title": "Cross-Project Task System Configuration",
   "type": "object",
   "additionalProperties": false,
@@ -14,6 +14,7 @@
     "lifecycle",
     "research",
     "commands",
+    "concurrency",
     "artifacts",
     "acceptance_criteria",
     "plan",
@@ -24,12 +25,10 @@
   ],
   "properties": {
     "schema_version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "const": "2.0.0"
     },
     "task_system_version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "const": "2.0.0"
     },
     "timezone": {
       "type": "string",
@@ -101,6 +100,7 @@
         "scope",
         "sequence_width",
         "allocation",
+        "collision_policy",
         "format"
       ],
       "properties": {
@@ -117,7 +117,10 @@
           "maximum": 8
         },
         "allocation": {
-          "const": "scan_active_and_archive"
+          "const": "scan_active_archive_and_remote_branches"
+        },
+        "collision_policy": {
+          "const": "retry_next_sequence"
         },
         "format": {
           "type": "string",
@@ -203,22 +206,48 @@
       },
       "required": [
         "status",
+        "untracked",
         "diff_base",
         "diff_full",
+        "diff_worktree",
+        "diff_staged",
         "format",
         "lint",
         "typecheck",
         "unit_test",
         "integration_test",
         "end_to_end_test",
-        "build"
+        "build",
+        "validate_task_system",
+        "generate_index"
       ]
+    },
+    "concurrency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "multiple_active_tasks_allowed",
+        "max_pre_branch_tasks_per_worktree",
+        "separate_branch_or_worktree_required_for_implementation"
+      ],
+      "properties": {
+        "multiple_active_tasks_allowed": {
+          "type": "boolean"
+        },
+        "max_pre_branch_tasks_per_worktree": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "separate_branch_or_worktree_required_for_implementation": {
+          "const": true
+        }
+      }
     },
     "artifacts": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "require_all_template_files",
+        "require_all_template_files_while_active",
         "implementation_log_append_only_while_active",
         "screenshots_directory",
         "commit_only_relevant_screenshots",
@@ -226,7 +255,7 @@
         "remove_temporary_evidence_before_archive"
       ],
       "properties": {
-        "require_all_template_files": {
+        "require_all_template_files_while_active": {
           "const": true
         },
         "implementation_log_append_only_while_active": {
@@ -314,7 +343,8 @@
       "additionalProperties": false,
       "required": [
         "branch_pattern",
-        "require_clean_worktree_before_branch",
+        "require_no_unrelated_changes_before_branch",
+        "allow_current_task_artifacts_before_branch",
         "on_unrelated_uncommitted_changes",
         "allow_automatic_stash",
         "commit_policy",
@@ -326,7 +356,10 @@
           "type": "string",
           "minLength": 1
         },
-        "require_clean_worktree_before_branch": {
+        "require_no_unrelated_changes_before_branch": {
+          "const": true
+        },
+        "allow_current_task_artifacts_before_branch": {
           "const": true
         },
         "on_unrelated_uncommitted_changes": {
@@ -355,8 +388,11 @@
         "ci_poll_interval_seconds",
         "ci_timeout_minutes",
         "wait_for_review_comments",
+        "required_checks_mode",
         "required_checks",
+        "on_no_checks_discovered",
         "merge_strategy",
+        "on_ambiguous_repository_policy",
         "fallback_merge_strategy",
         "archival_pr_required",
         "archival_pr_requires_additional_user_approval"
@@ -376,6 +412,13 @@
         "wait_for_review_comments": {
           "const": false
         },
+        "required_checks_mode": {
+          "enum": [
+            "discover",
+            "explicit",
+            "none"
+          ]
+        },
         "required_checks": {
           "type": "array",
           "uniqueItems": true,
@@ -384,12 +427,24 @@
             "minLength": 1
           }
         },
+        "on_no_checks_discovered": {
+          "enum": [
+            "stop_and_ask",
+            "allow_no_checks"
+          ]
+        },
         "merge_strategy": {
           "enum": [
-            "repository_default",
+            "repository_policy",
             "squash",
             "merge",
             "rebase"
+          ]
+        },
+        "on_ambiguous_repository_policy": {
+          "enum": [
+            "use_fallback",
+            "stop_and_ask"
           ]
         },
         "fallback_merge_strategy": {

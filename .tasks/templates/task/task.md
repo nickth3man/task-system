@@ -1,10 +1,10 @@
-# TASK-0000-000 — Replace with task title
+# __REQUIRED_TASK_ID__ — __REQUIRED_TASK_TITLE__
 
 ## Record
 
-- Type: `feature`
-- Source: Human request
-- Source reference: Not applicable
+- Type: `[task type]`
+- Source: `[human/agent/GitHub issue/audit/other]`
+- Source reference: `[reference or Not applicable]`
 - Created: `[ISO-8601 timestamp]`
 - Task revision: `1`
 
@@ -16,7 +16,7 @@ Preserve the user's request as closely as practical. Do not rewrite it into a di
 
 ## Objective
 
-Describe the independently mergeable outcome in one or two paragraphs.
+Describe one independently mergeable outcome.
 
 ## Scope
 
@@ -34,13 +34,13 @@ Describe the independently mergeable outcome in one or two paragraphs.
 
 ## Non-goals
 
-- [Related work that this task will not attempt]
+- [Related work this task will not attempt]
 
 ## Acceptance criteria
 
 ### AC-01 — Replace with criterion title
 
-State an observable, testable outcome. Avoid prescribing implementation unless the implementation itself is the requirement.
+State an observable, testable outcome. Avoid prescribing implementation unless the implementation itself is required.
 
 Verification expectation:
 - [Command, inspection, measurement, or user-visible behavior]
@@ -55,13 +55,13 @@ Verification expectation:
 
 ## Request interpretation
 
-Record any interpretation required to turn the request into an independently mergeable task. Clearly label assumptions.
+Record assumptions or interpretation required to turn the request into one independently mergeable task.
 
 ## Change control
 
-After plan approval, the original request, scope, constraints, non-goals, and acceptance criteria are locked. A material change requires:
+After plan approval, the request, scope, constraints, non-goals, and acceptance criteria are locked. A material contract change requires:
 
-1. An increment to `revisions.task` in `task.yaml` when the task contract changes.
-2. Updated findings or plan revisions as applicable.
-3. Invalidation of affected approvals.
-4. Renewed user approval in chat.
+1. Incrementing `revisions.task` in `task.yaml`.
+2. Updating findings or plan revisions as applicable.
+3. Invalidating affected approvals.
+4. Obtaining renewed approval in chat.

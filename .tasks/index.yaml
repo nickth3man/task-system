@@ -1,12 +1,6 @@
-# GENERATED VIEW ONLY.
-# The authoritative state for each task is its own task.yaml.
-# Regenerate this file by scanning .tasks/active and .tasks/archive.
-
-schema_version: "1.0.0"
-task_system_version: "1.0.0"
-generated_at: null
-
+# GENERATED VIEW ONLY. Run: python scripts/generate_index.py
+# Task records are authoritative; this file is navigation only.
+schema_version: 2.0.0
+task_system_version: 2.0.0
 active: []
 archived: []
-
-next_sequence_by_year: {}

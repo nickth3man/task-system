@@ -4,8 +4,8 @@ task_system_version: "2.0.0"
 timezone: "UTC"
 
 repository:
-  name: "task-system"
-  default_branch: "main"
+  name: "__REQUIRED_REPOSITORY_NAME__"
+  default_branch: "__REQUIRED_DEFAULT_BRANCH__"
   remote: "origin"
   provider: "github"
 
@@ -27,11 +27,7 @@ lifecycle:
   full_profile_required: true
   allow_not_applicable_with_reason: true
   one_agent_owns_lifecycle: true
-  required_approvals:
-    - "findings"
-    - "plan"
-    - "pull_request"
-    - "merge"
+  required_approvals: ["findings", "plan", "pull_request", "merge"]
   approval_source: "chat"
   material_changes_invalidate_approval: true
 

@@ -2,14 +2,15 @@
 
 ## Record
 
-- Task: `TASK-0000-000`
+- Task: `__REQUIRED_TASK_ID__`
 - Findings revision: `1`
 - Based on: `assessment.md`, `research.md`, and `links.md`
+- SHA-256: `[computed immediately before approval request]`
 - Approval status: Pending
 
 ## Executive conclusion
 
-State the evidence-backed conclusion and recommended direction in a compact form.
+State the evidence-backed conclusion and recommended direction compactly.
 
 ## Findings
 
@@ -23,7 +24,7 @@ Conclusion:
 - [Finding]
 
 Impact:
-- [Why it matters to the task]
+- [Why it matters]
 
 ## Options considered
 
@@ -51,7 +52,7 @@ Risks:
 
 ## Recommended direction
 
-Describe the recommended approach at decision level, not as a step-by-step implementation plan.
+Describe the recommendation at decision level, not as a step-by-step plan.
 
 ## Rejected alternatives
 
@@ -65,12 +66,12 @@ Describe the recommended approach at decision level, not as a step-by-step imple
 
 ## Remaining risks
 
-- [Risk that the implementation plan must address]
+- [Risk the implementation plan must address]
 
 ## Open questions
 
-- [Question requiring user input or planning work]
+- [Question requiring input or planning]
 
 ## Approval request
 
-Ask the user to approve this exact findings revision in chat. The agent records the approval in `task.yaml`; this file is not the authoritative approval record.
+Compute the SHA-256 digest of this exact file, then ask the user to approve the exact revision and digest. Record the approval only in `task.yaml`. Any content change requires a new digest; material changes require a new revision and approval.

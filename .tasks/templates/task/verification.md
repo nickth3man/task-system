@@ -2,7 +2,7 @@
 
 ## Record
 
-- Task: `TASK-0000-000`
+- Task: `__REQUIRED_TASK_ID__`
 - Branch: `[branch]`
 - Head SHA: `[SHA]`
 - Verification status: In progress
