@@ -2,7 +2,11 @@
 
 ## Repository baseline
 
-Document architecture, current behavior, and relevant data flow.
+Document relevant architecture, runtime boundaries, data flow, and current behavior.
+
+## Expected behavior
+
+Describe the observable behavior that should exist after the task is complete. Do not select the implementation approach here.
 
 ## Files inspected
 
@@ -19,6 +23,11 @@ Document architecture, current behavior, and relevant data flow.
 ## Important code locations
 
 - __REQUIRED_LOCATION__
+
+## Existing tests and validation paths
+
+- Test suite, fixture, or workflow: __REQUIRED_TEST_OR_VALIDATION_PATH__
+- Current result or coverage: __REQUIRED_TEST_RESULT__
 
 ## Assumptions
 

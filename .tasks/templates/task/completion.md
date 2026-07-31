@@ -12,7 +12,11 @@ __REQUIRED_OUTCOME__
 
 ## Acceptance criteria
 
-- AC-01: __REQUIRED_STATUS_AND_EVIDENCE__
+Record one row for every entry in `task.yaml.acceptance_criteria`.
+
+| Criterion | Final status | Durable evidence |
+|---|---|---|
+| AC-01 | __REQUIRED_STATUS__ | __REQUIRED_EVIDENCE__ |
 
 ## Durable implementation summary
 

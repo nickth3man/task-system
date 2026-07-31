@@ -6,6 +6,10 @@ Version 2 treats `.tasks/` as both the distributable product and the live task i
 
 This means copying `.tasks/` carries repository-specific configuration while omitting root-level scripts, dependency declarations, and the project `AGENTS.md` template. The directory is therefore not a self-contained copy-and-paste product.
 
+## Expected behavior
+
+`.tasks/` remains a pristine, self-contained product bundle. The task-system source repository governs its own changes through a separate live `.project-tasks/` instance. Adopters validate the pristine bundle, initialize it as `mode: live`, and then validate it with an instance-only command.
+
 ## Files inspected
 
 | Path | Observation |
@@ -23,6 +27,7 @@ This means copying `.tasks/` carries repository-specific configuration while omi
 | Command | Purpose | Result |
 |---|---|---|
 | GitHub repository inspection | Confirm current structure and latest merged state | Version 2 is on `main` at `8b2ed41390840f57ad7cf15aa80d73435d454f29`. |
+| `python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks` | Validate the proposed two-root layout | Passed before PR creation. |
 
 ## Important code locations
 
@@ -31,9 +36,15 @@ This means copying `.tasks/` carries repository-specific configuration while omi
 - `.tasks/scripts/validate.py`: shared validator for template and live instances.
 - `.tasks/scripts/generate_index.py`: configurable live-index generator.
 
+## Existing tests and validation paths
+
+- Local validator command: `python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks`.
+- Index check: `python .tasks/scripts/generate_index.py --instance-root .project-tasks --check`.
+- GitHub Actions check: `Validate task system`.
+
 ## Assumptions
 
-- Adopting repositories normally use `.tasks/` as both the installed bundle and live instance.
+- Adopting repositories normally use `.tasks/` as both the installed bundle and live instance after initialization.
 - Only the task-system source repository needs a separate `.project-tasks/` live root.
 
 ## Risks

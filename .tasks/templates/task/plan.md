@@ -5,6 +5,8 @@
 - Findings revision used: `1`
 - Approval status: Pending
 
+Repeat the following section for every entry in `task.yaml.plan_steps`. Each step must reference every acceptance criterion it supports.
+
 ## PLAN-01 — __REQUIRED_STEP_TITLE__
 
 Supports: `AC-01`

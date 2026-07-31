@@ -2,6 +2,8 @@
 
 ## Acceptance criteria
 
+Repeat the following subsection for every entry in `task.yaml.acceptance_criteria` and keep the stable ID unchanged.
+
 ### AC-01 — __REQUIRED_CRITERION_TITLE__
 
 - Status: Pending
@@ -13,8 +15,8 @@
 
 ## Known failures
 
-- None
+- __REQUIRED_FAILURE_OR_NONE__
 
 ## Skipped checks
 
-- None
+- __REQUIRED_SKIPPED_CHECK_OR_NONE__

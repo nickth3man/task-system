@@ -24,6 +24,8 @@ Describe one independently mergeable outcome.
 
 ## Acceptance criteria
 
+Repeat the following subsection for every entry in `task.yaml.acceptance_criteria`, using matching stable IDs (`AC-01`, `AC-02`, and so on).
+
 ### AC-01 — __REQUIRED_CRITERION_TITLE__
 
 State an observable, testable result.

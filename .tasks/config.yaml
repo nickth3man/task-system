@@ -49,7 +49,8 @@ commands:
   integration_test: null
   end_to_end_test: null
   build: null
-  validate_task_system: "python .tasks/scripts/validate.py --instance-root .tasks"
+  validate_template: "python .tasks/scripts/validate.py --template-only --template-root .tasks"
+  validate_task_system: "python .tasks/scripts/validate.py --instance-only --instance-root .tasks"
   generate_index: "python .tasks/scripts/generate_index.py --instance-root .tasks"
 
 concurrency:

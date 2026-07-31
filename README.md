@@ -13,28 +13,34 @@ This repository deliberately separates the **task-system product** from the **ta
 
 The `.tasks/` directory must remain generic. It contains no real active or archived tasks and no configuration initialized for this repository. All changes to the task-system product are governed by live task records under `.project-tasks/`.
 
-Adopting repositories normally do not need `.project-tasks/`: after copying `.tasks/`, they use `.tasks/` as both the installed product and live task instance.
+Adopting repositories normally do not need `.project-tasks/`. After a copied `.tasks/` bundle is validated and initialized, that directory changes from a pristine template into the repository's live task instance.
 
 ## Copy-and-paste installation
 
 1. Copy the entire `.tasks/` directory into the target repository.
-2. Replace every `__REQUIRED_*__` value in `.tasks/config.yaml`.
-3. Copy `.tasks/templates/AGENTS.md` to the target repository root as `AGENTS.md`, or merge its task-system section into an existing root file.
-4. Copy `.tasks/templates/github/workflows/validate-task-system.yml` to `.github/workflows/validate-task-system.yml`.
-5. Install the bundled dependencies:
+2. Install the bundled dependencies:
 
    ```bash
    python -m pip install -r .tasks/requirements.txt
    ```
 
-6. Generate and validate the initial live index:
+3. Validate the untouched distributable bundle:
+
+   ```bash
+   python .tasks/scripts/validate.py --template-only --template-root .tasks
+   ```
+
+4. Initialize `.tasks/config.yaml` by replacing every `__REQUIRED_*__` value and changing `mode: template` to `mode: live`.
+5. Copy `.tasks/templates/AGENTS.md` to the target repository root as `AGENTS.md`, or merge its task-system section into an existing root file.
+6. Copy `.tasks/templates/github/workflows/validate-task-system.yml` to `.github/workflows/validate-task-system.yml`.
+7. Generate and validate the initial live instance:
 
    ```bash
    python .tasks/scripts/generate_index.py --instance-root .tasks
-   python .tasks/scripts/validate.py --instance-root .tasks
+   python .tasks/scripts/validate.py --instance-only --instance-root .tasks
    ```
 
-The complete installation contract is inside `.tasks/`; no root-level script or dependency file from this source repository is required.
+Routine validation in an adopting repository uses `--instance-only`. The complete installation contract is inside `.tasks/`; no root-level script or dependency file from this source repository is required.
 
 ## Product contents
 
@@ -102,20 +108,25 @@ Correction loops:
 ```text
 reviewing → implementing → testing → committing → reviewing
 waiting_for_ci → implementing → testing → committing → reviewing → pushing → waiting_for_ci
+awaiting_merge_approval → implementing → testing → committing → reviewing → pushing → waiting_for_ci
 ```
 
 ## Validation guarantees
 
 The bundled validator checks:
 
-- The `.tasks/` product is self-contained and generic.
+- The pristine `.tasks/` product is self-contained and generic.
+- Installed live instances are validated separately from pristine templates.
 - No live task exists under the distributable active/archive directories.
-- Live configurations contain no unresolved placeholders.
+- Live configurations and Markdown artifacts contain no unresolved placeholders.
+- Configured paths resolve inside the intended template or live-instance root.
 - Configurations and tasks satisfy the bundled JSON Schemas.
-- Required task artifacts exist.
-- Task IDs, acceptance criteria, and plan-step references are consistent.
-- Findings and plan approvals match SHA-256 artifact digests.
-- Active/archive placement agrees with task status.
+- Required active artifacts, screenshot directories, and configured archive artifacts exist.
+- Complete lifecycle histories use connected, allowed transitions.
+- Findings and plan approvals match current revisions and SHA-256 artifact digests.
+- PR and merge approvals match the current production candidate; merge approval requires passed checks.
+- Approval gates, acceptance criteria, and plan completion are satisfied before merge-related states.
+- Acceptance criteria and plan steps remain traceable through their Markdown artifacts.
 - The live generated index is current.
 - No unresolved merge-conflict markers remain.
 
