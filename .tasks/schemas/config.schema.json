@@ -1,0 +1,445 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/task-system/config.schema.json",
+  "title": "Cross-Project Task System Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_system_version",
+    "timezone",
+    "repository",
+    "paths",
+    "identifiers",
+    "lifecycle",
+    "research",
+    "commands",
+    "artifacts",
+    "acceptance_criteria",
+    "plan",
+    "git",
+    "github",
+    "archive",
+    "overrides"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "task_system_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "timezone": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "default_branch",
+        "remote",
+        "provider"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "default_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "enum": [
+            "github",
+            "other"
+          ]
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "active",
+        "archive",
+        "template",
+        "index"
+      ],
+      "properties": {
+        "active": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archive": {
+          "type": "string",
+          "minLength": 1
+        },
+        "template": {
+          "type": "string",
+          "minLength": 1
+        },
+        "index": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "identifiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prefix",
+        "scope",
+        "sequence_width",
+        "allocation",
+        "format"
+      ],
+      "properties": {
+        "prefix": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_-]*$"
+        },
+        "scope": {
+          "const": "repository"
+        },
+        "sequence_width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "allocation": {
+          "const": "scan_active_and_archive"
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "full_profile_required",
+        "allow_not_applicable_with_reason",
+        "one_agent_owns_lifecycle",
+        "required_approvals",
+        "approval_source",
+        "material_changes_invalidate_approval"
+      ],
+      "properties": {
+        "full_profile_required": {
+          "const": true
+        },
+        "allow_not_applicable_with_reason": {
+          "type": "boolean"
+        },
+        "one_agent_owns_lifecycle": {
+          "const": true
+        },
+        "required_approvals": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "findings",
+              "plan",
+              "pull_request",
+              "merge"
+            ]
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "approval_source": {
+          "const": "chat"
+        },
+        "material_changes_invalidate_approval": {
+          "const": true
+        }
+      }
+    },
+    "research": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage_required",
+        "allow_no_external_sources_with_rationale",
+        "preferred_source_order"
+      ],
+      "properties": {
+        "stage_required": {
+          "const": true
+        },
+        "allow_no_external_sources_with_rationale": {
+          "type": "boolean"
+        },
+        "preferred_source_order": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "required": [
+        "status",
+        "diff_base",
+        "diff_full",
+        "format",
+        "lint",
+        "typecheck",
+        "unit_test",
+        "integration_test",
+        "end_to_end_test",
+        "build"
+      ]
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "require_all_template_files",
+        "implementation_log_append_only_while_active",
+        "screenshots_directory",
+        "commit_only_relevant_screenshots",
+        "condense_log_before_archive",
+        "remove_temporary_evidence_before_archive"
+      ],
+      "properties": {
+        "require_all_template_files": {
+          "const": true
+        },
+        "implementation_log_append_only_while_active": {
+          "const": true
+        },
+        "screenshots_directory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit_only_relevant_screenshots": {
+          "type": "boolean"
+        },
+        "condense_log_before_archive": {
+          "type": "boolean"
+        },
+        "remove_temporary_evidence_before_archive": {
+          "type": "boolean"
+        }
+      }
+    },
+    "acceptance_criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "require_stable_ids",
+        "id_prefix",
+        "require_explicit_verification",
+        "allow_failed_at_merge",
+        "allow_unverified_at_merge"
+      ],
+      "properties": {
+        "require_stable_ids": {
+          "const": true
+        },
+        "id_prefix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "require_explicit_verification": {
+          "const": true
+        },
+        "allow_failed_at_merge": {
+          "const": false
+        },
+        "allow_unverified_at_merge": {
+          "const": false
+        }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "require_stable_ids",
+        "id_prefix",
+        "require_files_or_symbols",
+        "require_validation",
+        "require_risks",
+        "require_rollback_or_migration_when_applicable"
+      ],
+      "properties": {
+        "require_stable_ids": {
+          "const": true
+        },
+        "id_prefix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "require_files_or_symbols": {
+          "type": "boolean"
+        },
+        "require_validation": {
+          "type": "boolean"
+        },
+        "require_risks": {
+          "type": "boolean"
+        },
+        "require_rollback_or_migration_when_applicable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branch_pattern",
+        "require_clean_worktree_before_branch",
+        "on_unrelated_uncommitted_changes",
+        "allow_automatic_stash",
+        "commit_policy",
+        "commit_subject_pattern",
+        "push_before_pr_approval"
+      ],
+      "properties": {
+        "branch_pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "require_clean_worktree_before_branch": {
+          "const": true
+        },
+        "on_unrelated_uncommitted_changes": {
+          "const": "stop_and_ask"
+        },
+        "allow_automatic_stash": {
+          "const": false
+        },
+        "commit_policy": {
+          "const": "logical_incremental"
+        },
+        "commit_subject_pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "push_before_pr_approval": {
+          "type": "boolean"
+        }
+      }
+    },
+    "github": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "ci_poll_interval_seconds",
+        "ci_timeout_minutes",
+        "wait_for_review_comments",
+        "required_checks",
+        "merge_strategy",
+        "fallback_merge_strategy",
+        "archival_pr_required",
+        "archival_pr_requires_additional_user_approval"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "ci_poll_interval_seconds": {
+          "type": "integer",
+          "minimum": 10
+        },
+        "ci_timeout_minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "wait_for_review_comments": {
+          "const": false
+        },
+        "required_checks": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "merge_strategy": {
+          "enum": [
+            "repository_default",
+            "squash",
+            "merge",
+            "rebase"
+          ]
+        },
+        "fallback_merge_strategy": {
+          "enum": [
+            "squash",
+            "merge",
+            "rebase"
+          ]
+        },
+        "archival_pr_required": {
+          "const": true
+        },
+        "archival_pr_requires_additional_user_approval": {
+          "const": false
+        }
+      }
+    },
+    "archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path_pattern",
+        "preserve",
+        "condense_or_remove"
+      ],
+      "properties": {
+        "path_pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preserve": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "condense_or_remove": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "overrides": {
+      "type": "object"
+    }
+  }
+}

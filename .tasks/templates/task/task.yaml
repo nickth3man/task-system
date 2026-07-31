@@ -68,11 +68,13 @@ approvals:
     source: "chat"
     evidence: null
 
+# Keep criterion text in task.md. Track only IDs, status, and evidence here.
 acceptance_criteria:
   - id: "AC-01"
     status: "pending"
     evidence: []
 
+# Populate after plan creation. Keep full step text in plan.md.
 plan_steps:
   - id: "PLAN-01"
     status: "pending"
