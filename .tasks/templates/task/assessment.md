@@ -1,83 +1,38 @@
 # Assessment
 
-## Status
-
-- Task: `__REQUIRED_TASK_ID__`
-- Assessment state: In progress
-- Repository default branch: `[branch]`
-- Assessed base commit: `[SHA]`
-- Assessment timestamp: `[ISO-8601 timestamp]`
-- Initial working-tree status: `[clean or summarized changes]`
-
-Record the base commit and timestamp in `task.yaml` under `assessment`.
-
-## Assessment objective
-
-Explain what must be understood before selecting an implementation approach.
-
 ## Repository baseline
 
-Summarize relevant architecture, runtime boundaries, data flow, and current behavior.
-
-## Files inspected
-
-| Path | Symbols or line ranges | Why inspected | Relevant observation |
-|---|---|---|---|
-| `[path]` | `[symbol or lines]` | [Reason] | [Observation] |
-
-## Repository commands run
-
-Record consequential commands only.
-
-| Command | Purpose | Result | Effect on assessment |
-|---|---|---|---|
-| `[command]` | [Purpose] | [Result] | [Impact] |
-
-## Current behavior
-
-Describe the observed current state. For bugs, include reproduction steps and actual results.
+Document relevant architecture, runtime boundaries, data flow, and current behavior.
 
 ## Expected behavior
 
-Describe the intended outcome without choosing an implementation prematurely.
+Describe the observable behavior that should exist after the task is complete. Do not select the implementation approach here.
+
+## Files inspected
+
+| Path | Symbols or lines | Observation |
+|---|---|---|
+| __REQUIRED_PATH__ | __REQUIRED_SYMBOLS__ | __REQUIRED_OBSERVATION__ |
+
+## Commands run
+
+| Command | Purpose | Result |
+|---|---|---|
+| __REQUIRED_COMMAND__ | __REQUIRED_PURPOSE__ | __REQUIRED_RESULT__ |
 
 ## Important code locations
 
-| Location | Responsibility | Relevance |
-|---|---|---|
-| `[path:symbol]` | [Responsibility] | [Why it matters] |
+- __REQUIRED_LOCATION__
 
 ## Existing tests and validation paths
 
-- [Test suite, fixture, command, workflow, or manual validation path]
-
-## Constraints discovered
-
-- [Constraint]
+- Test suite, fixture, or workflow: __REQUIRED_TEST_OR_VALIDATION_PATH__
+- Current result or coverage: __REQUIRED_TEST_RESULT__
 
 ## Assumptions
 
-- [Assumption and why it is reasonable]
+- __REQUIRED_ASSUMPTION_OR_NONE__
 
 ## Risks
 
-| Risk | Likelihood | Impact | Initial mitigation |
-|---|---|---|---|
-| [Risk] | [Low/Medium/High] | [Low/Medium/High] | [Mitigation] |
-
-## Unknowns and questions
-
-- [Unknown research or findings must resolve]
-
-## Base-drift recheck
-
-Complete immediately before branch creation.
-
-- Current default-branch commit: `[SHA]`
-- Changes since assessed commit: `[summary or None]`
-- Task-relevant drift: `[Yes/No]`
-- Action: `[Continue / refresh assessment / invalidate approval]`
-
-## Not applicable sections
-
-List any standard assessment area that does not apply and explain why.
+- __REQUIRED_RISK_OR_NONE__

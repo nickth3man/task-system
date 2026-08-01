@@ -1,19 +1,19 @@
-schema_version: "2.0.0"
-task_system_version: "2.0.0"
-
-timezone: "UTC"
+schema_version: "3.0.0"
+task_system_version: "3.0.0"
+mode: "live"
+timezone: "America/New_York"
 
 repository:
-  name: "__REQUIRED_REPOSITORY_NAME__"
-  default_branch: "__REQUIRED_DEFAULT_BRANCH__"
+  name: "task-system"
+  default_branch: "main"
   remote: "origin"
   provider: "github"
 
 paths:
-  active: ".tasks/active"
-  archive: ".tasks/archive"
+  active: ".project-tasks/active"
+  archive: ".project-tasks/archive"
   template: ".tasks/templates/task"
-  index: ".tasks/index.yaml"
+  index: ".project-tasks/index.yaml"
 
 identifiers:
   prefix: "TASK"
@@ -34,13 +34,6 @@ lifecycle:
 research:
   stage_required: true
   allow_no_external_sources_with_rationale: true
-  preferred_source_order:
-    - "repository_source_and_current_docs"
-    - "official_documentation"
-    - "primary_specifications_and_research"
-    - "maintainer_repositories_issues_and_release_notes"
-    - "high_quality_secondary_sources"
-    - "forums_as_supporting_evidence_only"
 
 commands:
   status: "git status --porcelain"
@@ -52,12 +45,12 @@ commands:
   format: null
   lint: null
   typecheck: null
-  unit_test: null
+  unit_test: "python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks"
   integration_test: null
   end_to_end_test: null
   build: null
-  validate_task_system: "python scripts/validate.py"
-  generate_index: "python scripts/generate_index.py"
+  validate_task_system: "python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks"
+  generate_index: "python .tasks/scripts/generate_index.py --instance-root .project-tasks"
 
 concurrency:
   multiple_active_tasks_allowed: true
@@ -102,8 +95,8 @@ github:
   ci_poll_interval_seconds: 30
   ci_timeout_minutes: 90
   wait_for_review_comments: false
-  required_checks_mode: "discover"
-  required_checks: []
+  required_checks_mode: "explicit"
+  required_checks: ["Validate task system"]
   on_no_checks_discovered: "stop_and_ask"
   merge_strategy: "repository_policy"
   on_ambiguous_repository_policy: "use_fallback"
@@ -112,7 +105,7 @@ github:
   archival_pr_requires_additional_user_approval: false
 
 archive:
-  path_pattern: ".tasks/archive/{year}/{month}/{id}-{slug}"
+  path_pattern: ".project-tasks/archive/{year}/{month}/{id}-{slug}"
   preserve:
     - "task.yaml"
     - "task.md"
@@ -131,4 +124,6 @@ archive:
     - "temporary_screenshots"
     - "duplicate_notes"
 
-overrides: {}
+overrides:
+  live_instance_root: ".project-tasks"
+  distributable_template_root: ".tasks"

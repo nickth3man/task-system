@@ -1,0 +1,11 @@
+# GENERATED VIEW ONLY. The authoritative state is each task.yaml.
+schema_version: 3.0.0
+task_system_version: 3.0.0
+active:
+- id: TASK-2026-002
+  slug: separate-template-and-project-state
+  title: Separate distributable template from project task state
+  status: awaiting_merge_approval
+  path: .project-tasks/active/TASK-2026-002-separate-template-and-project-state
+  archived: false
+archived: []

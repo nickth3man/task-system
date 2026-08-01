@@ -1,65 +1,31 @@
 # Implementation Log
 
-Append entries while the task is active. Do not rewrite previous entries except to correct an objective error. Record consequential actions, not every tool call or navigation command.
+Append consequential entries while active.
 
-## Entry template
+## __REQUIRED_TIMESTAMP__ — __REQUIRED_ENTRY_TITLE__
 
-### `[ISO-8601 timestamp]` — `[Short title]`
+### Commands
 
-State: `[implementing/testing/reviewing/etc.]`
+- `__REQUIRED_COMMAND_OR_NONE__` — __REQUIRED_COMMAND_RESULT__
 
-Commands:
-- `[consequential command]` — [result]
+### Changes
 
-Changes:
-- [Important code or artifact change]
+- __REQUIRED_CHANGE__
 
-Discoveries:
-- [New fact that affected implementation]
+### Discoveries
 
-Decisions:
-- [Decision and rationale]
+- __REQUIRED_DISCOVERY_OR_NONE__
 
-Rejected alternatives:
-- [Alternative and reason]
+### Decisions and rejected alternatives
 
-Plan deviation:
-- None
+- Decision: __REQUIRED_DECISION__
+- Rejected alternative: __REQUIRED_REJECTED_ALTERNATIVE_OR_NONE__
 
-Failures and resolution:
-- [Failure and fix, or None]
+### Deviations, failures, and resolutions
 
-Metrics or evidence:
-- [Measurement, screenshot path, log excerpt, or Not applicable]
+- Plan deviation: __REQUIRED_DEVIATION_OR_NONE__
+- Failure and resolution: __REQUIRED_FAILURE_RESOLUTION_OR_NONE__
 
----
+### Metrics or evidence
 
-## Entries
-
-### `[ISO-8601 timestamp]` — Task implementation started
-
-State: `implementing`
-
-Commands:
-- [Command]
-
-Changes:
-- [Change]
-
-Discoveries:
-- None
-
-Decisions:
-- [Decision]
-
-Rejected alternatives:
-- None
-
-Plan deviation:
-- None
-
-Failures and resolution:
-- None
-
-Metrics or evidence:
-- Not applicable
+- __REQUIRED_METRIC_OR_EVIDENCE__

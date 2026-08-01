@@ -1,41 +1,81 @@
 # Cross-Project Task System
 
-A repository-local workflow for taking one independently mergeable unit of work from intake through assessment, research, findings, approval, planning, implementation, verification, review, GitHub CI, merge, and durable archival.
+A repository-local, AI-agent-friendly workflow for taking one independently mergeable unit of work from intake through assessment, research, findings, planning, implementation, verification, review, CI, merge, and durable archival.
 
-Version 2 adds executable validation, deterministic index generation, artifact-digest approvals, explicit correction loops, committed-head review, safe pre-branch handling, base-drift checks, and one-pass archival.
+## Two roles in this source repository
 
-## Core rule
-
-One independently mergeable unit of work equals one task directory.
-
-Keep changes together when they share one acceptance outcome and must ship atomically. Split them when they solve different problems, can be reviewed or merged separately, have different risks or approvals, or one can be abandoned without invalidating the other.
-
-## Repository layout
+This repository deliberately separates the **task-system product** from the **task records used to develop the product**.
 
 ```text
-AGENTS.md                         # live project-specific instructions
-AGENTS.project-template.md        # template for adopting projects
-requirements-dev.txt              # validator dependencies
-scripts/
-├── validate.py                   # schema + semantic validation
-└── generate_index.py             # deterministic index generation
-.github/workflows/validate.yml    # validation workflow
+.tasks/          distributable product; copy this directory into another repository
+.project-tasks/  live task instance for nickth3man/task-system itself
+```
+
+The `.tasks/` directory must remain generic. It contains no real active or archived tasks and no configuration initialized for this repository. All changes to the task-system product are governed by live task records under `.project-tasks/`.
+
+Adopting repositories normally do not need `.project-tasks/`. After a copied `.tasks/` bundle is validated and initialized, that directory changes from a pristine template into the repository's live task instance.
+
+## Copy-and-paste installation
+
+1. Copy the entire `.tasks/` directory into the target repository.
+2. Install the bundled dependencies:
+
+   ```bash
+   python -m pip install -r .tasks/requirements.txt
+   ```
+
+3. Validate the untouched distributable bundle:
+
+   ```bash
+   python .tasks/scripts/validate.py --template-only --template-root .tasks
+   ```
+
+4. Initialize `.tasks/config.yaml` by replacing every `__REQUIRED_*__` value and changing `mode: template` to `mode: live`.
+5. Copy `.tasks/templates/AGENTS.md` to the target repository root as `AGENTS.md`, or merge its task-system section into an existing root file.
+6. Copy `.tasks/templates/github/workflows/validate-task-system.yml` to `.github/workflows/validate-task-system.yml`.
+7. Generate and validate the initial live instance:
+
+   ```bash
+   python .tasks/scripts/generate_index.py --instance-root .tasks
+   python .tasks/scripts/validate.py --instance-only --instance-root .tasks
+   ```
+
+Routine validation in an adopting repository uses `--instance-only`. The complete installation contract is inside `.tasks/`; no root-level script or dependency file from this source repository is required.
+
+## Product contents
+
+```text
 .tasks/
-├── AGENTS.md                     # lifecycle rules
+├── AGENTS.md
+├── README.md
 ├── VERSION
-├── config.yaml                   # live repository configuration
-├── index.yaml                    # generated navigation view
+├── config.yaml
+├── index.yaml
+├── requirements.txt
+├── active/
+├── archive/
 ├── schemas/
 │   ├── config.schema.json
 │   └── task.schema.json
-├── templates/
-│   ├── config.yaml               # consumer configuration template
-│   └── task/
-├── active/
-└── archive/YYYY/MM/
+├── scripts/
+│   ├── generate_index.py
+│   └── validate.py
+└── templates/
+    ├── AGENTS.md
+    ├── github/workflows/validate-task-system.yml
+    └── task/
 ```
 
-`task.yaml` is authoritative for task state. Markdown artifacts contain the request, evidence, findings, plan, implementation history, verification, review, and completion record. `.tasks/index.yaml` is derived and must never allocate IDs or override a task record.
+## Source-repository development
+
+For this repository, install dependencies and run:
+
+```bash
+python .tasks/scripts/generate_index.py --instance-root .project-tasks
+python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks
+```
+
+New source-repository tasks are copied from `.tasks/templates/task/` into the active path configured in `.project-tasks/config.yaml`.
 
 ## Lifecycle
 
@@ -63,150 +103,37 @@ draft
 → archived
 ```
 
-Correction loops are explicit:
+Correction loops:
 
 ```text
 reviewing → implementing → testing → committing → reviewing
 waiting_for_ci → implementing → testing → committing → reviewing → pushing → waiting_for_ci
+awaiting_merge_approval → implementing → testing → committing → reviewing → pushing → waiting_for_ci
 ```
 
-Exceptional states are `blocked`, `failed`, `cancelled`, and `superseded`.
+## Validation guarantees
 
-`completed` means the implementation pull request merged. `archived` means the finalized task directory exists under `.tasks/archive/` on the default branch.
+The bundled validator checks:
 
-## Approval gates
-
-The user approves in chat at four points:
-
-1. Findings approval, bound to the findings revision and SHA-256 digest.
-2. Plan approval, bound to the plan revision/digest and the task/findings revisions it depends on.
-3. Pull-request creation approval, bound to the exact pushed head SHA.
-4. Merge approval, bound to the exact PR head SHA while required checks are green.
-
-A material task, findings, or plan change invalidates affected approvals. Any new commit invalidates merge approval.
-
-## Review model
-
-Review occurs after the candidate change has been committed. The agent reviews the committed range from the assessed/base commit to the current head, plus staged, unstaged, and untracked-file safety checks.
-
-This prevents `base...HEAD` commands from silently omitting uncommitted implementation work. Review findings loop back through implementation, testing, committing, and review before push.
-
-## Pre-branch safety
-
-Assessment, research, findings, and planning are written before branch creation. Their uncommitted files are allowed, but they must be the only uncommitted changes in that worktree.
-
-The system requires no unrelated changes, not a completely clean worktree. The agent never automatically stashes or discards user work.
-
-Immediately before branch creation, the agent checks whether the default branch changed since assessment. Relevant drift refreshes assessment and invalidates approvals when necessary.
-
-## CI and merge behavior
-
-`required_checks_mode` distinguishes three cases:
-
-- `discover`: inspect repository requirements and check runs.
-- `explicit`: require configured check names.
-- `none`: intentionally use no checks through an explicit repository policy.
-
-An empty `required_checks` list is not automatically success. Under discovery mode, finding no checks follows `on_no_checks_discovered`, which defaults to `stop_and_ask`.
-
-The merge method follows repository policy. When repository settings allow several methods without selecting one, the configured ambiguity rule applies; the default fallback is squash.
-
-## One-pass archival
-
-After the implementation PR merges, a documentation-only archival PR:
-
-1. Finalizes implementation merge metadata.
-2. Condenses durable implementation history.
-3. Removes temporary evidence.
-4. Moves the task from active to its dated archive path.
-5. Records archival PR metadata and inherited authorization.
-6. Regenerates the task index.
-
-The archived record does not try to contain the archival PR's own merge SHA or merge timestamp. That information cannot be truthfully written inside the same PR before it merges. Presence of the task directory in the archive on the default branch is the proof of archival.
-
-## Validation
-
-Install the validation dependencies:
-
-```bash
-python -m pip install -r requirements-dev.txt
-```
-
-Run all checks:
-
-```bash
-python scripts/validate.py
-```
-
-The validator checks:
-
-- Configuration and task JSON Schemas
-- Semantic state and approval invariants
-- Approval revision, digest, and head-SHA bindings
-- Allowed lifecycle transitions and correction loops
-- Unique task, acceptance-criterion, and plan-step IDs
-- Plan-step references to real acceptance criteria
-- Required active artifacts
-- Active/archive status and path consistency
-- Blocker resume metadata
-- Unreplaced live placeholders
-- Unresolved merge-conflict markers
-- Task-system version consistency
-- Generated index consistency
-
-Regenerate the index:
-
-```bash
-python scripts/generate_index.py
-```
-
-Check without writing:
-
-```bash
-python scripts/generate_index.py --check
-```
-
-GitHub Actions runs the same validator on pushes and pull requests.
-
-## Install into another repository
-
-1. Copy `.tasks/`, `scripts/validate.py`, `scripts/generate_index.py`, and `requirements-dev.txt` into the target repository.
-2. Copy `AGENTS.project-template.md` to the target repository as `AGENTS.md`, or merge its task-system section into an existing root `AGENTS.md`.
-3. Replace `.tasks/config.yaml` with `.tasks/templates/config.yaml`, then fill every `__REQUIRED_*__` value and repository-specific command.
-4. Merge `.github/workflows/validate.yml` into the target repository's workflows. Rename the workflow or job only if the configured required-check policy is updated with it.
-5. Run `python scripts/generate_index.py` and `python scripts/validate.py`.
-6. Commit the installation through the target repository's normal review process.
-
-The live `.tasks/config.yaml` in this repository is configured for `nickth3man/task-system`; it is not the consumer template.
-
-## Start a task
-
-Allocate the next repository/year sequence by scanning active tasks, archived tasks, and remote task branches. Recheck after creating the directory to detect concurrent allocation.
-
-Copy the task template:
-
-```bash
-cp -R .tasks/templates/task .tasks/active/TASK-2026-001-example-task
-```
-
-PowerShell:
-
-```powershell
-Copy-Item .tasks\templates\task .tasks\active\TASK-2026-001-example-task -Recurse
-```
-
-Replace every `__REQUIRED_*__` value. The template is intentionally schema-invalid until initialized, preventing placeholder task records from passing validation accidentally.
+- The pristine `.tasks/` product is self-contained and generic.
+- Installed live instances are validated separately from pristine templates.
+- No live task exists under the distributable active/archive directories.
+- Live configurations and Markdown artifacts contain no unresolved placeholders.
+- Configured paths resolve inside the intended template or live-instance root.
+- Configurations and tasks satisfy the bundled JSON Schemas.
+- Required active artifacts, screenshot directories, and configured archive artifacts exist.
+- Complete lifecycle histories use connected, allowed transitions.
+- Findings and plan approvals match current revisions and SHA-256 artifact digests.
+- PR and merge approvals match the current production candidate; merge approval requires passed checks.
+- Approval gates, acceptance criteria, and plan completion are satisfied before merge-related states.
+- Acceptance criteria and plan steps remain traceable through their Markdown artifacts.
+- The live generated index is current.
+- No unresolved merge-conflict markers remain.
 
 ## Versioning
 
-The system uses semantic versioning:
-
-- Patch: compatible wording, examples, or template corrections.
-- Minor: new optional fields or artifacts.
-- Major: required schema, lifecycle, state, approval, or archival changes.
-
-Each task records the task-system version under which it was created. Archived records do not need to be rewritten for a later major version unless a migration is explicitly required.
+Version 3.0.0 introduces the self-contained `.tasks/` bundle and separate source-repository live state. Existing v1/v2 installations are not automatically migrated.
 
 ## License
 
-This project is available under the MIT License.
+MIT

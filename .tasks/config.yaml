@@ -1,11 +1,11 @@
-schema_version: "2.0.0"
-task_system_version: "2.0.0"
-
-timezone: "UTC"
+schema_version: "3.0.0"
+task_system_version: "3.0.0"
+mode: "template"
+timezone: "__REQUIRED_TIMEZONE__"
 
 repository:
-  name: "task-system"
-  default_branch: "main"
+  name: "__REQUIRED_REPOSITORY_NAME__"
+  default_branch: "__REQUIRED_DEFAULT_BRANCH__"
   remote: "origin"
   provider: "github"
 
@@ -27,24 +27,13 @@ lifecycle:
   full_profile_required: true
   allow_not_applicable_with_reason: true
   one_agent_owns_lifecycle: true
-  required_approvals:
-    - "findings"
-    - "plan"
-    - "pull_request"
-    - "merge"
+  required_approvals: ["findings", "plan", "pull_request", "merge"]
   approval_source: "chat"
   material_changes_invalidate_approval: true
 
 research:
   stage_required: true
   allow_no_external_sources_with_rationale: true
-  preferred_source_order:
-    - "repository_source_and_current_docs"
-    - "official_documentation"
-    - "primary_specifications_and_research"
-    - "maintainer_repositories_issues_and_release_notes"
-    - "high_quality_secondary_sources"
-    - "forums_as_supporting_evidence_only"
 
 commands:
   status: "git status --porcelain"
@@ -60,8 +49,9 @@ commands:
   integration_test: null
   end_to_end_test: null
   build: null
-  validate_task_system: "python scripts/validate.py"
-  generate_index: "python scripts/generate_index.py"
+  validate_template: "python .tasks/scripts/validate.py --template-only --template-root .tasks"
+  validate_task_system: "python .tasks/scripts/validate.py --instance-only --instance-root .tasks"
+  generate_index: "python .tasks/scripts/generate_index.py --instance-root .tasks"
 
 concurrency:
   multiple_active_tasks_allowed: true

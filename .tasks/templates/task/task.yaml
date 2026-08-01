@@ -1,13 +1,11 @@
-schema_version: "2.0.0"
-task_system_version: "2.0.0"
-
-# This template is intentionally invalid until every __REQUIRED_*__ value is replaced.
+schema_version: "3.0.0"
+task_system_version: "3.0.0"
 id: "__REQUIRED_TASK_ID__"
 slug: "__REQUIRED_SLUG__"
-title: "__REQUIRED_TASK_TITLE__"
+title: "__REQUIRED_TITLE__"
 type: "feature"
 status: "draft"
-status_reason: null
+status_reason: "Initialized from template"
 created_at: "__REQUIRED_CREATED_AT__"
 updated_at: "__REQUIRED_UPDATED_AT__"
 
@@ -20,14 +18,16 @@ repository:
 
 source:
   kind: "human"
-  reference: null
+  reference: "__REQUIRED_SOURCE_REFERENCE__"
 
 assessment:
   base_commit: null
   assessed_at: null
+  base_drift_checked_at: null
+  base_drift_result: null
 
 branch:
-  name: null
+  name: "task/__REQUIRED_TASK_ID__-__REQUIRED_SLUG__"
   base_branch: "__REQUIRED_DEFAULT_BRANCH__"
   base_commit: null
   created_at: null
@@ -39,119 +39,40 @@ revisions:
   plan: 0
 
 approvals:
-  findings:
-    status: "pending"
-    revision: null
-    artifact_sha256: null
-    head_sha: null
-    task_revision: null
-    findings_revision: null
-    plan_revision: null
-    approved_by: null
-    approved_at: null
-    source: null
-    evidence: null
-  plan:
-    status: "pending"
-    revision: null
-    artifact_sha256: null
-    head_sha: null
-    task_revision: null
-    findings_revision: null
-    plan_revision: null
-    approved_by: null
-    approved_at: null
-    source: null
-    evidence: null
-  pull_request:
-    status: "pending"
-    revision: null
-    artifact_sha256: null
-    head_sha: null
-    task_revision: null
-    findings_revision: null
-    plan_revision: null
-    approved_by: null
-    approved_at: null
-    source: null
-    evidence: null
-  merge:
-    status: "pending"
-    revision: null
-    artifact_sha256: null
-    head_sha: null
-    task_revision: null
-    findings_revision: null
-    plan_revision: null
-    approved_by: null
-    approved_at: null
-    source: null
-    evidence: null
+  findings: {status: pending, revision: null, artifact_sha256: null, task_revision: null, findings_revision: null, head_sha: null, approved_by: null, approved_at: null, source: chat, evidence: null}
+  plan: {status: pending, revision: null, artifact_sha256: null, task_revision: null, findings_revision: null, head_sha: null, approved_by: null, approved_at: null, source: chat, evidence: null}
+  pull_request: {status: pending, revision: null, artifact_sha256: null, task_revision: null, findings_revision: null, head_sha: null, approved_by: null, approved_at: null, source: chat, evidence: null}
+  merge: {status: pending, revision: null, artifact_sha256: null, task_revision: null, findings_revision: null, head_sha: null, approved_by: null, approved_at: null, source: chat, evidence: null}
 
-# Keep criterion text in task.md. Track only IDs, status, and evidence here.
 acceptance_criteria:
   - id: "AC-01"
     status: "pending"
     evidence: []
-
-# Populate after plan creation. Keep full step text in plan.md.
-plan_steps: []
-
-state_history: []
-
-git:
-  commits: []
-  pushed: false
-  remote: "origin"
-  head_sha: null
-  pushed_at: null
-
+plan_steps:
+  - id: "PLAN-01"
+    status: "pending"
+    supports: ["AC-01"]
+state_history:
+  - at: "__REQUIRED_CREATED_AT__"
+    from: null
+    to: "draft"
+    actor: "__REQUIRED_ACTOR__"
+    reason: "Task initialized"
+git: {commits: [], pushed: false, remote: origin, candidate_head_sha: null, head_sha: null, pushed_at: null}
 pull_request:
   state: "not_created"
   number: null
   url: null
   base_branch: "__REQUIRED_DEFAULT_BRANCH__"
-  head_branch: null
+  head_branch: "task/__REQUIRED_TASK_ID__-__REQUIRED_SLUG__"
   head_sha: null
   created_at: null
-  checks:
-    status: "not_started"
-    last_polled_at: null
-    required: []
-    results: []
-
-merge:
-  strategy: "repository_policy"
-  commit_sha: null
-  merged_at: null
-  merged_by: null
-
+  checks: {status: not_started, last_polled_at: null, required: [], results: []}
+merge: {strategy: repository_policy, commit_sha: null, merged_at: null, merged_by: null}
 archive:
   status: "not_started"
   path: null
-  authorization:
-    mode: "not_started"
-    source_approval_head_sha: null
-  pull_request:
-    number: null
-    url: null
-    head_branch: null
-    head_sha: null
-    checks_status: "not_started"
-    prepared_at: null
-
-blocker:
-  is_blocked: false
-  entered_from_status: null
-  reason: null
-  since: null
-  attempted_resolutions: []
-  required_user_decision: null
-  resolved_at: null
-  resolution: null
-  resume_status: null
-
-risks:
-  remaining: []
-  known_failures: []
-  skipped_checks: []
+  authorization: {mode: inherited, inherited_from: implementation_merge_approval}
+  pull_request: {number: null, url: null, head_branch: null, head_sha: null, checks_status: not_started}
+blocker: {is_blocked: false, entered_from_status: null, reason: null, since: null, attempted_resolutions: [], required_user_decision: null, resolved_at: null, resolution: null, resume_status: null}
+risks: {remaining: [], known_failures: [], skipped_checks: []}
