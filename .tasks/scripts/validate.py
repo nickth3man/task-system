@@ -660,7 +660,13 @@ def validate_blocker(
         errors.append(f'{task_id}: blocker.entered_from_status must be a normal state')
     if not isinstance(resume_status, str) or resume_status not in NORMAL_STATES:
         errors.append(f'{task_id}: blocker.resume_status must be a normal state')
-    if entered_from in {'completed', 'archived'} or resume_status in {'completed', 'archived'}:
+    entered_from_is_terminal = (
+        isinstance(entered_from, str) and entered_from in {'completed', 'archived'}
+    )
+    resume_status_is_terminal = (
+        isinstance(resume_status, str) and resume_status in {'completed', 'archived'}
+    )
+    if entered_from_is_terminal or resume_status_is_terminal:
         errors.append(f'{task_id}: blocker cannot enter from or resume to a terminal state')
     if isinstance(entered_from, str) and resume_status != entered_from:
         errors.append(

@@ -216,6 +216,36 @@ class ValidatorTests(unittest.TestCase):
 
             self.assertIsInstance(errors, list)
 
+    def test_malformed_blocker_states_do_not_raise_type_error(self) -> None:
+        task = {
+            'status': 'blocked',
+            'blocker': {
+                'is_blocked': True,
+                'entered_from_status': ['implementing'],
+                'resume_status': {'state': 'implementing'},
+                'reason': 'test',
+                'since': '2026-07-31T00:00:00Z',
+                'required_user_decision': 'test',
+            },
+        }
+        errors: list[str] = []
+
+        validate.validate_blocker(
+            'TASK-2026-001',
+            task,
+            {'blocked'},
+            errors,
+        )
+
+        self.assertTrue(
+            any('entered_from_status must be a normal state' in error for error in errors),
+            errors,
+        )
+        self.assertTrue(
+            any('resume_status must be a normal state' in error for error in errors),
+            errors,
+        )
+
     def test_traceability_matching_is_token_bounded(self) -> None:
         self.assertFalse(validate.references_id('Only AC-010 is present.', 'AC-01'))
         self.assertTrue(validate.references_id('Criterion `AC-01` is present.', 'AC-01'))
