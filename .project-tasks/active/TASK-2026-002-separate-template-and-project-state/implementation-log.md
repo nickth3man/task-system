@@ -79,3 +79,46 @@
 
 - All Codex, CodeRabbit, Cubic, and Sourcery actionable findings were mapped to code or documentation changes.
 - The final validation suite covers positive template/live flows and the reported negative cases.
+
+## 2026-07-31T20:00:00-04:00 — Address second review pass
+
+### Commands
+
+- `python -m py_compile .tasks/scripts/validate.py .tasks/scripts/generate_index.py .tasks/tests/test_tools.py` — passed.
+- `python -m unittest discover -s .tasks/tests -p "test_*.py" -v` — 8 regression tests passed locally and in GitHub Actions.
+- `python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks` — passed after normalizing the generated template index.
+
+### Changes
+
+- Required merge approval, the recorded PR head, and the reviewed candidate head to reference the same commit.
+- Rejected symlinked task records that resolve outside configured active or archive roots.
+- Required non-empty schema and task-system versions before index generation.
+- Made malformed list-valued IDs and plan references produce validation errors instead of `TypeError` crashes.
+- Required the distributable index to equal the deterministic empty generated index.
+- Replaced substring traceability checks with token-bounded AC and PLAN matching.
+- Restricted blocked-task resumption to its recorded nonterminal resume state.
+- Made `completed` terminal except for the normal `completed -> archived` transition.
+- Added eight regression tests and ran them in both source-repository and adopter CI workflows.
+
+### Discoveries
+
+- The checked-in template index used quoted version strings, while deterministic generation emitted equivalent unquoted scalars; exact generated-view enforcement correctly detected the difference.
+- Review invariants need executable regression tests in addition to semantic validation so future refactors cannot silently reintroduce the same edge cases.
+
+### Decisions and rejected alternatives
+
+- Decision: preserve exact generated-index formatting rather than accepting merely equivalent YAML.
+- Decision: retain one shared regression suite inside the copyable `.tasks/` bundle and execute it in adopter CI.
+- Rejected alternative: allowing blocked tasks to resume at arbitrary later states, because that bypasses mandatory lifecycle gates.
+
+### Deviations, failures, and resolutions
+
+- Plan deviation: None; the work is review-driven hardening within the approved validation scope.
+- Failure and resolution: GitHub Actions run `30674627587` failed because `.tasks/index.yaml` was not byte-for-byte equal to the generated empty view. The index was regenerated in commit `ff5bbdeb076ba1f98d46afaa494c641f56f384a0`; run `30674658942` then passed.
+
+### Metrics or evidence
+
+- Eight targeted regression tests passed.
+- All eight findings from the second Cubic review pass were addressed.
+- Final reviewed production candidate: `ff5bbdeb076ba1f98d46afaa494c641f56f384a0`.
+- Required workflow run `30674658942` passed.
