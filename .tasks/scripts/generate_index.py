@@ -9,6 +9,9 @@ from typing import Any
 import yaml
 
 
+INDEX_HEADER = '# GENERATED VIEW ONLY. The authoritative state is each task.yaml.\n'
+
+
 def load_yaml(path: Path) -> dict[str, Any]:
     try:
         with path.open('r', encoding='utf-8') as handle:
@@ -35,10 +38,19 @@ def safe_relative(repo_root: Path, path: Path) -> str:
 
 
 def ensure_within(path: Path, root: Path, label: str) -> None:
+    resolved_path = path.resolve(strict=False)
+    resolved_root = root.resolve(strict=False)
     try:
-        path.resolve(strict=False).relative_to(root.resolve(strict=False))
+        resolved_path.relative_to(resolved_root)
     except ValueError as exc:
-        raise ValueError(f'{label} resolves outside {root}') from exc
+        raise ValueError(f'{label} resolves outside {resolved_root}') from exc
+
+
+def require_nonempty_string(config: dict[str, Any], key: str, config_path: Path) -> str:
+    value = config.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f'{config_path}: {key} must be a non-empty string')
+    return value
 
 
 def task_entries(
@@ -47,9 +59,12 @@ def task_entries(
     archived: bool,
 ) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
-    if not root.exists():
+    resolved_root = root.resolve(strict=False)
+    if not resolved_root.exists():
         return entries
-    for task_file in sorted(root.rglob('task.yaml')):
+
+    for task_file in sorted(resolved_root.rglob('task.yaml')):
+        ensure_within(task_file, resolved_root, f'task file {task_file}')
         task = load_yaml(task_file)
         entries.append(
             {
@@ -68,25 +83,29 @@ def build_index(
     repo_root: Path,
     instance_root: Path,
 ) -> tuple[Path, dict[str, Any]]:
-    config = load_yaml(instance_root / 'config.yaml')
+    config_path = instance_root / 'config.yaml'
+    config = load_yaml(config_path)
+    schema_version = require_nonempty_string(config, 'schema_version', config_path)
+    task_system_version = require_nonempty_string(
+        config, 'task_system_version', config_path
+    )
+
     paths = config.get('paths')
     if not isinstance(paths, dict):
-        raise ValueError(f'{instance_root / "config.yaml"}: paths must be a mapping')
+        raise ValueError(f'{config_path}: paths must be a mapping')
 
     resolved: dict[str, Path] = {}
     for key in ('active', 'archive', 'index'):
         value = paths.get(key)
         if not isinstance(value, str) or not value:
-            raise ValueError(
-                f'{instance_root / "config.yaml"}: paths.{key} must be a non-empty string'
-            )
+            raise ValueError(f'{config_path}: paths.{key} must be a non-empty string')
         target = repo_path(repo_root, value).resolve(strict=False)
         ensure_within(target, instance_root, f'paths.{key}')
         resolved[key] = target
 
     data = {
-        'schema_version': config.get('schema_version'),
-        'task_system_version': config.get('task_system_version'),
+        'schema_version': schema_version,
+        'task_system_version': task_system_version,
         'active': task_entries(repo_root, resolved['active'], archived=False),
         'archived': task_entries(repo_root, resolved['archive'], archived=True),
     }
@@ -95,7 +114,7 @@ def build_index(
 
 def render(data: dict[str, Any]) -> str:
     body = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
-    return '# GENERATED VIEW ONLY. The authoritative state is each task.yaml.\n' + body
+    return INDEX_HEADER + body
 
 
 def main() -> int:
