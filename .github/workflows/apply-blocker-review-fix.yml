@@ -1,0 +1,103 @@
+name: Apply blocker validation review fix
+
+on:
+  push:
+    branches:
+      - task/TASK-2026-002-separate-template-and-project-state
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out task branch
+        uses: actions/checkout@v4
+        with:
+          ref: task/TASK-2026-002-separate-template-and-project-state
+          fetch-depth: 0
+
+      - name: Apply validated blocker fix and regression test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          validate_path = Path('.tasks/scripts/validate.py')
+          text = validate_path.read_text(encoding='utf-8')
+          old = """    if entered_from in {'completed', 'archived'} or resume_status in {'completed', 'archived'}:
+              errors.append(f'{task_id}: blocker cannot enter from or resume to a terminal state')
+          """
+          new = """    entered_from_is_terminal = (
+              isinstance(entered_from, str) and entered_from in {'completed', 'archived'}
+          )
+              resume_status_is_terminal = (
+              isinstance(resume_status, str) and resume_status in {'completed', 'archived'}
+          )
+              if entered_from_is_terminal or resume_status_is_terminal:
+              errors.append(f'{task_id}: blocker cannot enter from or resume to a terminal state')
+          """
+          if old in text:
+              validate_path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          elif new not in text:
+              raise SystemExit('validate.py blocker target was not found')
+
+          test_path = Path('.tasks/tests/test_tools.py')
+          test_text = test_path.read_text(encoding='utf-8')
+          anchor = """    def test_traceability_matching_is_token_bounded(self) -> None:
+          """
+          test = """    def test_malformed_blocker_states_do_not_raise_type_error(self) -> None:
+              task = {
+                  'status': 'blocked',
+                  'blocker': {
+                      'is_blocked': True,
+                      'entered_from_status': ['implementing'],
+                      'resume_status': {'state': 'implementing'},
+                      'reason': 'test',
+                      'since': '2026-07-31T00:00:00Z',
+                      'required_user_decision': 'test',
+                  },
+              }
+              errors: list[str] = []
+
+              validate.validate_blocker(
+                  'TASK-2026-001',
+                  task,
+                  {'blocked'},
+                  errors,
+              )
+
+              self.assertTrue(
+                  any('entered_from_status must be a normal state' in error for error in errors),
+                  errors,
+              )
+              self.assertTrue(
+                  any('resume_status must be a normal state' in error for error in errors),
+                  errors,
+              )
+
+          """
+          if test not in test_text:
+              if anchor not in test_text:
+                  raise SystemExit('test insertion anchor was not found')
+              test_path.write_text(test_text.replace(anchor, test + anchor, 1), encoding='utf-8')
+          PY
+
+      - name: Run regression suite
+        run: |
+          python -m pip install -r .tasks/requirements.txt
+          python -m py_compile .tasks/scripts/validate.py .tasks/scripts/generate_index.py .tasks/tests/test_tools.py
+          python -m unittest discover -s .tasks/tests -p "test_*.py" -v
+
+      - name: Commit and push fix
+        run: |
+          if git diff --quiet; then
+            echo "Fix already applied"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .tasks/scripts/validate.py .tasks/tests/test_tools.py
+          git commit -m "TASK-2026-002: guard malformed blocker metadata"
+          git push origin HEAD:task/TASK-2026-002-separate-template-and-project-state
