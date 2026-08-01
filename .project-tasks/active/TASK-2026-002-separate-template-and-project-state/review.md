@@ -28,8 +28,8 @@
 ## CI result
 
 - Intermediate run `30674627587` correctly failed on a stale template index.
-- Commit `ff5bbdeb076ba1f98d46afaa494c641f56f384a0` normalized the generated view.
-- Final required workflow run `30674658942` passed.
+- Commit `ff5bbdeb076ba1f98d46afaa494c641f56f384a0` normalized the generated view and remains the reviewed production candidate.
+- Later task-record-only documentation commits preserved that candidate and passed the required workflow; latest run `30674924252` passed.
 
 ## Verdict
 
