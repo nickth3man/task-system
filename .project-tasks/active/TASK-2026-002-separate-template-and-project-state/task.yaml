@@ -5,9 +5,9 @@ slug: separate-template-and-project-state
 title: Separate distributable template from project task state
 type: refactor
 status: awaiting_merge_approval
-status_reason: All review findings from both remediation cycles are addressed and the required workflow passed on the reviewed production candidate; awaiting user merge approval
+status_reason: All requested review findings are addressed and the required workflow passed on the clean production candidate; awaiting user merge approval
 created_at: '2026-07-31T18:34:00-04:00'
-updated_at: '2026-07-31T20:12:00-04:00'
+updated_at: '2026-07-31T20:51:00-04:00'
 repository:
   name: task-system
   default_branch: main
@@ -61,11 +61,11 @@ approvals:
     artifact_sha256: null
     task_revision: 1
     findings_revision: 1
-    head_sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
+    head_sha: 0aa95eea88f99c98fef59b6a38f6d44a5bfe6f02
     approved_by: user
-    approved_at: '2026-07-31T20:00:00-04:00'
+    approved_at: '2026-07-31T20:45:00-04:00'
     source: chat
-    evidence: User again explicitly requested that all review comments be addressed and the existing pull request be updated.
+    evidence: User explicitly requested validation and correction of the malformed blocker metadata finding on the existing pull request.
   merge:
     status: pending
     revision: null
@@ -94,13 +94,13 @@ acceptance_criteria:
   status: passed
   evidence:
   - .tasks/scripts/validate.py supports separate template-only, instance-only, same-root, and dual-root validation
-  - Semantic validation covers lifecycle transitions, blocked-state resumption, approval binding, PR/candidate head consistency, path and symlink containment, artifacts, traceability, generated-index exactness, and merge readiness
+  - Semantic validation covers lifecycle transitions, blocked-state resumption, approval binding, PR/candidate head consistency, path and symlink containment, artifacts, traceability, generated-index exactness, merge readiness, and malformed blocker metadata
   - .tasks/scripts/generate_index.py requires version metadata, rejects task-file escapes, and reports malformed input cleanly
-  - .tasks/tests/test_tools.py contains eight targeted regression tests
+  - .tasks/tests/test_tools.py contains nine targeted regression tests
 - id: AC-04
   status: passed
   evidence:
-  - GitHub Actions workflow Validate task system run 30674658942 passed on candidate ff5bbdeb076ba1f98d46afaa494c641f56f384a0
+  - GitHub Actions workflow Validate task system run 30676496878 passed on cleanup candidate 0aa95eea88f99c98fef59b6a38f6d44a5bfe6f02
   - Source and adopter workflows run regression tests before semantic validation
 - id: AC-05
   status: passed
@@ -314,6 +314,41 @@ state_history:
   to: awaiting_merge_approval
   actor: agent
   reason: Required workflow run 30674658942 passed on candidate ff5bbdeb076ba1f98d46afaa494c641f56f384a0
+- at: '2026-07-31T20:45:00-04:00'
+  from: awaiting_merge_approval
+  to: implementing
+  actor: agent
+  reason: User requested validation and correction of malformed blocker metadata handling
+- at: '2026-07-31T20:46:00-04:00'
+  from: implementing
+  to: testing
+  actor: agent
+  reason: Type-guarded blocker validation and its regression scenario were exercised
+- at: '2026-07-31T20:47:00-04:00'
+  from: testing
+  to: committing
+  actor: agent
+  reason: Compilation and all nine regression tests passed
+- at: '2026-07-31T20:48:00-04:00'
+  from: committing
+  to: reviewing
+  actor: agent
+  reason: Malformed blocker metadata remediation was committed and reviewed
+- at: '2026-07-31T20:49:00-04:00'
+  from: reviewing
+  to: pushing
+  actor: agent
+  reason: Same-agent review passed for the blocker validation correction
+- at: '2026-07-31T20:50:00-04:00'
+  from: pushing
+  to: waiting_for_ci
+  actor: agent
+  reason: Blocker validation fix and temporary-workflow cleanup were pushed
+- at: '2026-07-31T20:51:00-04:00'
+  from: waiting_for_ci
+  to: awaiting_merge_approval
+  actor: agent
+  reason: Required workflow run 30676496878 passed on cleanup candidate 0aa95eea88f99c98fef59b6a38f6d44a5bfe6f02
 git:
   commits:
   - sha: ab166a02be48109a18ea5623681e8748a7d7ff74
@@ -336,28 +371,32 @@ git:
     subject: 'TASK-2026-002: include regression tests in adopter workflow'
   - sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
     subject: 'TASK-2026-002: normalize generated template index'
+  - sha: c44a23a5cbe3a1b328584c87cf53e3900ebc1c27
+    subject: 'TASK-2026-002: guard malformed blocker metadata'
+  - sha: 0aa95eea88f99c98fef59b6a38f6d44a5bfe6f02
+    subject: 'TASK-2026-002: remove temporary blocker fix workflow'
   pushed: true
   remote: origin
-  candidate_head_sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
-  head_sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
-  pushed_at: '2026-07-31T20:11:00-04:00'
+  candidate_head_sha: 0aa95eea88f99c98fef59b6a38f6d44a5bfe6f02
+  head_sha: 0aa95eea88f99c98fef59b6a38f6d44a5bfe6f02
+  pushed_at: '2026-07-31T20:50:00-04:00'
 pull_request:
   state: open
   number: 2
   url: https://github.com/nickth3man/task-system/pull/2
   base_branch: main
   head_branch: task/TASK-2026-002-separate-template-and-project-state
-  head_sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
+  head_sha: 0aa95eea88f99c98fef59b6a38f6d44a5bfe6f02
   created_at: '2026-07-31T22:45:48Z'
   checks:
     status: passed
-    last_polled_at: '2026-07-31T20:12:00-04:00'
+    last_polled_at: '2026-07-31T20:51:00-04:00'
     required:
     - Validate task system
     results:
     - name: Validate task system
       status: passed
-      url: https://github.com/nickth3man/task-system/actions/runs/30674658942
+      url: https://github.com/nickth3man/task-system/actions/runs/30676496878
 merge:
   strategy: repository_policy
   commit_sha: null
