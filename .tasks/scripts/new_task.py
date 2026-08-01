@@ -26,8 +26,6 @@ from generate_index import (
     repo_path,
 )
 
-from common import LITE_REQUIRED_FILES as LITE_FILES
-
 TASK_ID_RE = re.compile(r'^(?P<prefix>[A-Z]+)-(?P<year>\d{4})-(?P<sequence>\d+)$')
 SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 TASK_TYPES = (
@@ -180,43 +178,6 @@ def apply(text: str, values: dict[str, str]) -> str:
     return text
 
 
-def lite_profile_types(config: dict) -> set[str]:
-    """
-    Return the configured task types that use the lite profile.
-    
-    Parameters:
-    	config (dict): Repository configuration containing lifecycle settings.
-    
-    Returns:
-    	set[str]: Configured task type names, or an empty set when the setting is unavailable or invalid.
-    """
-    lifecycle = config.get('lifecycle') if isinstance(config.get('lifecycle'), dict) else {}
-    allowed = lifecycle.get('lite_profile_task_types')
-    if not isinstance(allowed, list):
-        return set()
-    return {item for item in allowed if isinstance(item, str)}
-
-
-def prune_to_lite(task_dir: Path) -> list[str]:
-    """Remove files and the evidence directory that are excluded from the lite profile.
-    
-    Parameters:
-    	task_dir (Path): Directory containing the task record.
-    
-    Returns:
-    	list[str]: Names of removed files, with the evidence directory represented with a trailing slash.
-    """
-    removed: list[str] = []
-    for path in sorted(task_dir.iterdir()):
-        if path.is_dir() and path.name == 'evidence':
-            shutil.rmtree(path)
-            removed.append(f'{path.name}/')
-        elif path.is_file() and path.name not in LITE_FILES:
-            path.unlink()
-            removed.append(path.name)
-    return removed
-
-
 def remaining_placeholders(task_dir: Path) -> dict[str, list[str]]:
     """
     Find unresolved required placeholders in Markdown and YAML files within a task directory.
@@ -323,8 +284,10 @@ def main() -> int:
             print(f'Would create {task_dir} from {template_root}')
             return 0
 
-        created_task_dir = task_dir
         shutil.copytree(template_root, task_dir)
+        # Only claim the directory for cleanup once this invocation created it, so a
+        # destination collision does not delete a concurrent creation's output.
+        created_task_dir = task_dir
         yaml_values = {k: yaml_scalar(v) for k, v in values.items()}
         for path in sorted(task_dir.rglob('*')):
             if not path.is_file() or path.suffix not in {'.md', '.yaml'}:
@@ -347,9 +310,6 @@ def main() -> int:
         # Verify the written task.yaml parses cleanly before committing.
         load_yaml(task_file)
 
-        lite = args.type in lite_profile_types(config)
-        pruned = prune_to_lite(task_dir) if lite else []
-
         index_path, data = build_index(repo_root, instance_root)
         index_path.parent.mkdir(parents=True, exist_ok=True)
         index_path.write_text(render(data), encoding='utf-8', newline='\n')
@@ -361,8 +321,6 @@ def main() -> int:
         return 1
 
     print(f'Created {task_dir}')
-    if pruned:
-        print(f'Lite profile ({args.type}): omitted {", ".join(pruned)}')
     print(f'Updated {index_path}')
 
     outstanding = remaining_placeholders(task_dir)

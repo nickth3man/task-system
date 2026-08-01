@@ -12,12 +12,7 @@ from typing import Any, Iterable
 from jsonschema import Draft202012Validator, FormatChecker
 import yaml
 
-from common import (
-    LITE_REQUIRED_DIRECTORIES,
-    LITE_REQUIRED_FILES,
-    PLACEHOLDER,
-    PLACEHOLDER_RE,
-)
+from common import PLACEHOLDER, PLACEHOLDER_RE
 from generate_index import (
     DEFAULT_BUNDLE_ROOT,
     DEFAULT_INSTANCE_ROOT,
@@ -41,9 +36,8 @@ TASK_MARKDOWN_ARTIFACTS = (
 )
 ACTIVE_REQUIRED_FILES = ('task.yaml', *TASK_MARKDOWN_ARTIFACTS)
 ACTIVE_REQUIRED_DIRECTORIES = ('evidence/screenshots',)
-# The lite profile folds assessment and research into findings.md and drops the
-# active-only working files. completion.md stays so archived records remain
-# self-describing. Every approval and traceability rule is unchanged.
+# Every task type requires the same artifacts. Sections that do not apply stay
+# present and say why, so a record is never ambiguous about what was considered.
 TEMPLATE_REQUIRED_FILES = (
     '.gitignore',
     'AGENTS.md',
@@ -74,19 +68,6 @@ TEMPLATE_REQUIRED_DIRECTORIES = (
 TEMPLATE_FORBIDDEN_DIRECTORIES = ('active', 'archive')
 TEMPLATE_FORBIDDEN_FILES = ('config.yaml', 'index.yaml')
 LIVE_STATE_PATH_KEYS = ('active', 'archive', 'index')
-
-# `init.py --prune-install-files` drops everything only needed at install time
-# and leaves this marker behind, so a pruned bundle still validates.
-BUNDLE_PRUNED_MARKER = '.pruned'
-INSTALL_ONLY_FILES = (
-    'README.md',
-    'scripts/init.py',
-    'tests/test_tools.py',
-    'templates/AGENTS.md',
-    'templates/instance/config.yaml',
-    'templates/github/workflows/validate-task-system.yml',
-)
-INSTALL_ONLY_DIRECTORIES = ('tests',)
 
 NORMAL_STATES = (
     'draft',
@@ -384,19 +365,10 @@ def validate_template(
         config_schema (dict[str, Any]): Schema used to validate the template instance configuration.
         errors (list[str]): List to which validation errors are appended.
     """
-    pruned = (template_root / BUNDLE_PRUNED_MARKER).is_file()
-    required_files = tuple(
-        name for name in TEMPLATE_REQUIRED_FILES
-        if not (pruned and name in INSTALL_ONLY_FILES)
-    )
-    required_directories = tuple(
-        name for name in TEMPLATE_REQUIRED_DIRECTORIES
-        if not (pruned and name in INSTALL_ONLY_DIRECTORIES)
-    )
     require_paths(
         template_root,
-        required_files,
-        required_directories,
+        TEMPLATE_REQUIRED_FILES,
+        TEMPLATE_REQUIRED_DIRECTORIES,
         repo_root,
         errors,
         'bundle',
@@ -681,24 +653,6 @@ def validate_history(task_id: str, task: dict[str, Any], errors: list[str]) -> s
     return reached
 
 
-def uses_lite_profile(task: dict[str, Any], config: dict[str, Any]) -> bool:
-    """
-    Determine whether a task uses the configured lite artifact profile.
-    
-    Parameters:
-    	task (dict[str, Any]): Task data containing its type.
-    	config (dict[str, Any]): Configuration containing lifecycle settings.
-    
-    Returns:
-    	bool: `true` if the task type is listed in `lite_profile_task_types`, `false` otherwise.
-    """
-    lifecycle = config.get('lifecycle')
-    allowed = lifecycle.get('lite_profile_task_types') if isinstance(lifecycle, dict) else None
-    if not isinstance(allowed, list):
-        return False
-    return task.get('type') in {item for item in allowed if isinstance(item, str)}
-
-
 def validate_artifacts(
     repo_root: Path,
     task_dir: Path,
@@ -717,7 +671,6 @@ def validate_artifacts(
     	task (dict[str, Any]): Task metadata, including acceptance criteria and plan steps.
     	archived (bool): Whether the task is archived.
     """
-    lite = uses_lite_profile(task, config)
     if archived:
         archive_config = config.get('archive')
         preserve = archive_config.get('preserve') if isinstance(archive_config, dict) else None
@@ -726,16 +679,9 @@ def validate_artifacts(
             if isinstance(preserve, list)
             else ('task.yaml', 'task.md', 'completion.md')
         )
-        if lite:
-            required_files = tuple(
-                name for name in required_files if name in LITE_REQUIRED_FILES
-            )
         if 'task.yaml' not in required_files:
             required_files = ('task.yaml', *required_files)
         required_directories: tuple[str, ...] = ()
-    elif lite:
-        required_files = LITE_REQUIRED_FILES
-        required_directories = LITE_REQUIRED_DIRECTORIES
     else:
         required_files = ACTIVE_REQUIRED_FILES
         required_directories = ACTIVE_REQUIRED_DIRECTORIES
@@ -873,7 +819,7 @@ def validate_merge_readiness(
             errors.append(f'{task_id}: {status} requires passed pull-request checks')
 
     if status in MERGED_STATES:
-        if pull_request.get('state') != 'merged':
+        if ci_required and pull_request.get('state') != 'merged':
             errors.append(f'{task_id}: {status} requires a merged pull request')
         merge = task.get('merge') if isinstance(task.get('merge'), dict) else {}
         for field in ('commit_sha', 'merged_at', 'merged_by'):
@@ -1090,8 +1036,8 @@ def validate_instructions(
 
     if not text.strip():
         errors.append(
-            f'{label} is empty; run scripts/init.py --install-root-agents to write '
-            'the task-system section'
+            f'{label} is empty; run scripts/init.py to append the task-system '
+            'section'
         )
         return
 
@@ -1105,7 +1051,7 @@ def validate_instructions(
 
     for name in REMOVED_BUNDLE_PATHS:
         stale = f'{bundle}/{name}'
-        if re.search(rf'(?<![\w./-]){re.escape(stale)}(?=$|[^\w./-])', text):
+        if re.search(rf'(?<![\w./-]){re.escape(stale)}(?=$|[/\\]|[^\w./-])', text):
             errors.append(
                 f'{label} references {stale}, which no longer exists; live state '
                 f'moved to {instance}'

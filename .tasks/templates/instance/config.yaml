@@ -1,5 +1,5 @@
-schema_version: "4.0.0"
-task_system_version: "4.0.0"
+schema_version: "5.0.0"
+task_system_version: "5.0.0"
 mode: "template"
 timezone: "__REQUIRED_TIMEZONE__"
 
@@ -27,14 +27,9 @@ identifiers:
   collision_policy: "retry_next_sequence"
   format: "{prefix}-{year}-{sequence}"
 
-# Task types listed in `lite_profile_task_types` require a reduced artifact set:
-# task.yaml, task.md, findings.md, plan.md, verification.md, completion.md.
-# Assessment and research are folded into findings.md. Every approval, gate, and
-# traceability rule still applies. Leave the list empty to require the full
-# profile for every task type.
+# Every task type requires the same artifacts and passes the same gates. A
+# section that does not apply stays in place and explains why.
 lifecycle:
-  full_profile_required: true
-  lite_profile_task_types: ["documentation", "dependency"]
   allow_not_applicable_with_reason: true
   one_agent_owns_lifecycle: true
   required_approvals: ["findings", "plan", "pull_request", "merge"]

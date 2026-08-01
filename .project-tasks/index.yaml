@@ -1,6 +1,6 @@
 # GENERATED VIEW ONLY. The authoritative state is each task.yaml.
-schema_version: 4.0.0
-task_system_version: 4.0.0
+schema_version: 5.0.0
+task_system_version: 5.0.0
 active:
 - id: TASK-2026-002
   slug: separate-template-and-project-state

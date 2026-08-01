@@ -30,11 +30,15 @@ Use `python` instead of `python3` on Windows.
 3. Initialize the live instance:
 
    ```bash
-   python3 .tasks/scripts/init.py --install-root-agents --install-workflow
+   python3 .tasks/scripts/init.py
    ```
 
-4. Replace the remaining `__REQUIRED_*` values in the generated root `AGENTS.md`
-   and fill in the lint, type-check, and test commands in
+   There is nothing to configure. It writes the live instance, appends the
+   `## Task system` section to the root `AGENTS.md` without disturbing anything
+   already there, and installs the validation workflow. Re-running it never
+   overwrites your configuration or instructions.
+
+4. Fill in the lint, type-check, and test commands in
    `.project-tasks/config.yaml`.
 5. Validate:
 
@@ -42,9 +46,12 @@ Use `python` instead of `python3` on Windows.
    python3 .tasks/scripts/validate.py --instance-only --instance-root .project-tasks
    ```
 
-`.tasks/README.md` documents the installer flags, the no-CI configuration, and
-the upgrade procedure. The complete installation contract is inside `.tasks/`;
-no root-level script or dependency file from this repository is required.
+From here on, ask an agent in plain language — "create a task for X", "validate
+the task system" — and `.tasks/AGENTS.md` tells it exactly what to run.
+
+`.tasks/README.md` documents the no-CI configuration and the upgrade procedure.
+The complete installation contract is inside `.tasks/`; no root-level script or
+dependency file from this repository is required.
 
 ## Product contents
 
@@ -139,12 +146,21 @@ The bundled validator checks:
 
 ## Versioning
 
-Version 4.0.0 separates the replaceable bundle from live state in every
-installation, adds `scripts/init.py`, `scripts/new_task.py`, and `scripts/upgrade.py`, adds
-`paths.bundle` and `paths.instructions` to the configuration, validates the agent
-instruction file, adds the `lifecycle.lite_profile_task_types` profile, and makes
-the pull-request check gate conditional on `repository.provider` and
-`github.enabled`. Upgrade a 3.x installation by replacing the bundle and running
+Version 5.0.0 removes every variant from the system. The lite artifact profile
+and `lifecycle.lite_profile_task_types` are gone — one artifact set applies to
+every task type. `init.py` keeps only flags that supply data: the behavior
+toggles `--force`, `--install-root-agents`, `--instruction-file`,
+`--install-workflow`, and `--prune-install-files` are removed, the root
+`AGENTS.md` is always appended to and never replaced, and the validation workflow
+is always installed. A record created under the 4.x lite profile is missing five
+artifacts and will fail validation until they exist.
+
+Version 4.0.0 separated the replaceable bundle from live state in every
+installation, added `scripts/init.py`, `scripts/new_task.py`, and
+`scripts/upgrade.py`, added `paths.bundle` and `paths.instructions` to the
+configuration, validated the agent instruction file, and made the pull-request
+check gate conditional on `repository.provider` and `github.enabled`. Upgrade any
+installation by replacing the bundle and running
 `python3 .tasks/scripts/upgrade.py`. Version 3.0.0 introduced the self-contained
 `.tasks/` bundle. Existing v1/v2 installations are not automatically migrated.
 

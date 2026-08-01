@@ -1,5 +1,5 @@
-schema_version: "4.0.0"
-task_system_version: "4.0.0"
+schema_version: "5.0.0"
+task_system_version: "5.0.0"
 mode: "live"
 timezone: "America/New_York"
 
@@ -26,8 +26,6 @@ identifiers:
   format: "{prefix}-{year}-{sequence}"
 
 lifecycle:
-  full_profile_required: true
-  lite_profile_task_types: ["documentation", "dependency"]
   allow_not_applicable_with_reason: true
   one_agent_owns_lifecycle: true
   required_approvals: ["findings", "plan", "pull_request", "merge"]

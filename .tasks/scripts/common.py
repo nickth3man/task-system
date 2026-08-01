@@ -2,20 +2,10 @@ from __future__ import annotations
 
 import re
 import sys
-from pathlib import Path
 
 
 PLACEHOLDER = '__REQUIRED_'
 PLACEHOLDER_RE = re.compile(r'__REQUIRED_\S*')
-LITE_REQUIRED_FILES = (
-    'task.yaml',
-    'task.md',
-    'findings.md',
-    'plan.md',
-    'verification.md',
-    'completion.md',
-)
-LITE_REQUIRED_DIRECTORIES: tuple[str, ...] = ()
 
 
 def detect_interpreter() -> str:
@@ -52,6 +42,6 @@ def replace_path_in_text(text: str, old_path: str, new_path: str) -> str:
     escaped = re.escape(old).replace('/', r'[/\\]')
     pattern = re.compile(
         rf'(?<![A-Za-z0-9_.-]){escaped}'
-        r'(?=$|[/\\]|[\s"\'`,;])'
+        r'(?=$|[/\\]|[^A-Za-z0-9_.\-/\\])'
     )
     return pattern.sub(new, text)

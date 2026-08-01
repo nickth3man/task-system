@@ -32,17 +32,13 @@ from generate_index import (
 TEMPLATE_CONFIG = 'templates/instance/config.yaml'
 LIVE_STATE_KEYS = ('active', 'archive', 'index')
 LEGACY_BUNDLE_ENTRIES = ('config.yaml', 'index.yaml', 'active', 'archive')
-INSTRUCTION_CANDIDATES = (
-    'AGENTS.md',
-    'CLAUDE.md',
-    '.github/copilot-instructions.md',
+INSTRUCTION_FILE = 'AGENTS.md'
+# Configuration a previous version honoured and this one does not. Leaving these
+# behind would tell a reader the setting still does something.
+RETIRED_KEYS: tuple[tuple[str, ...], ...] = (
+    ('lifecycle', 'lite_profile_task_types'),
+    ('lifecycle', 'full_profile_required'),
 )
-# Where the safe upgrade value differs from the template default. Opting an
-# existing installation into the lite profile would retroactively relax the
-# artifact requirements of tasks already in flight.
-UPGRADE_DEFAULTS: dict[tuple[str, ...], Any] = {
-    ('lifecycle', 'lite_profile_task_types'): [],
-}
 
 
 class UpgradeFailure(Exception):
@@ -109,15 +105,14 @@ def missing_keys(
 ) -> list[tuple[tuple[str, ...], Any]]:
     """
     Find configuration keys that are missing from the live configuration.
-    
-    Missing keys are returned with their nested paths and template values, using
-    upgrade-specific defaults when configured.
-    
+
+    Missing keys are returned with their nested paths and template values.
+
     Parameters:
         template (Any): Template configuration to compare.
         live (Any): Existing live configuration.
         trail (tuple[str, ...]): Prefix for nested key paths.
-    
+
     Returns:
         list[tuple[tuple[str, ...], Any]]: Missing key paths paired with values to assign.
     """
@@ -127,18 +122,10 @@ def missing_keys(
     for key, value in template.items():
         path = (*trail, str(key))
         if key not in live:
-            found.append((path, _upgrade_value(path, value)))
+            found.append((path, value))
         else:
             found.extend(missing_keys(value, live[key], path))
     return found
-
-def _upgrade_value(path: tuple[str, ...], value: Any) -> Any:
-    """Apply UPGRADE_DEFAULTS at this path and at every path below it."""
-    if path in UPGRADE_DEFAULTS:
-        return UPGRADE_DEFAULTS[path]
-    if isinstance(value, dict):
-        return {key: _upgrade_value((*path, str(key)), item) for key, item in value.items()}
-    return value
 
 
 def assign(config: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
@@ -158,6 +145,29 @@ def assign(config: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
             target[key] = node
         target = node
     target[path[-1]] = value
+
+
+def remove_retired(config: dict[str, Any]) -> list[str]:
+    """
+    Drop configuration keys the installed version no longer honours.
+
+    Parameters:
+        config (dict[str, Any]): The live configuration to prune in place.
+
+    Returns:
+        list[str]: Dotted paths of the keys that were removed.
+    """
+    removed: list[str] = []
+    for path in RETIRED_KEYS:
+        target: Any = config
+        for key in path[:-1]:
+            target = target.get(key) if isinstance(target, dict) else None
+            if target is None:
+                break
+        if isinstance(target, dict) and path[-1] in target:
+            del target[path[-1]]
+            removed.append('.'.join(path))
+    return removed
 
 
 def rewrite_paths(
@@ -229,16 +239,15 @@ def rewrite_commands(
             if old_normalized not in updated:
                 continue
             old_instance = instance + old_normalized[len(bundle):]
-            # Only replace at a path boundary, and skip commands already
-            # pointing at the instance.
-            if old_instance in updated:
-                continue
+            # Only replace at a path boundary. A command may mention both the legacy
+            # and the instance path, so the presence of one does not skip the other.
             pattern = re.compile(
-                rf'(?<![A-Za-z0-9_.-]){re.escape(old_normalized)}(?=$|[/\\]|[\s"\'`,;])'
+                rf'(?<![A-Za-z0-9_.-]){re.escape(old_normalized)}'
+                rf'(?=$|[/\\]|[^A-Za-z0-9_.\-/\\])'
             )
             updated = pattern.sub(old_instance, updated)
         updated = re.sub(
-            rf'(--instance-root ){re.escape(bundle)}(?=$|[/\\]|[\s"\'`,;])',
+            rf'(--instance-root ){re.escape(bundle)}(?=$|[/\\]|[^A-Za-z0-9_.\-/\\])',
             rf'\g<1>{instance}',
             updated,
         )
@@ -246,22 +255,6 @@ def rewrite_commands(
             commands[key] = updated
             changed.append(f'commands.{key}')
     return changed
-
-
-def detect_instruction_file(repo_root: Path) -> str:
-    """
-    Selects the instruction file used by the repository.
-    
-    Parameters:
-    	repo_root (Path): Root directory of the repository.
-    
-    Returns:
-    	str: The first existing candidate instruction filename, or the default candidate when none exists.
-    """
-    for candidate in INSTRUCTION_CANDIDATES:
-        if (repo_root / candidate).is_file():
-            return candidate
-    return INSTRUCTION_CANDIDATES[0]
 
 
 def repair_instructions(
@@ -295,7 +288,7 @@ def repair_instructions(
             changed.append(f'{stale} -> {instance}/{name}')
 
     pattern = re.compile(
-        r'(task[ -]system version[^\S\n]{0,12})(\d+\.\d+\.\d+)', re.IGNORECASE
+        r'(task[ -]system version[^\n0-9]{0,12})(\d+\.\d+\.\d+)', re.IGNORECASE
     )
 
     def replace(match: re.Match[str]) -> str:
@@ -397,11 +390,13 @@ def main() -> int:
         if 'bundle' not in paths:
             paths['bundle'] = posix(repo_root, bundle_root)
         if 'instructions' not in paths:
-            paths['instructions'] = detect_instruction_file(repo_root)
+            paths['instructions'] = INSTRUCTION_FILE
         added = missing_keys(template, config)
         for path, value in added:
             assign(config, path, value)
             actions.append(f'add {".".join(path)} = {value!r}')
+        for name in remove_retired(config):
+            actions.append(f'remove {name} (no longer honoured)')
 
         for note in rewrite_paths(config, repo_root, bundle_root, instance_root):
             actions.append(f'rewrite {note}')

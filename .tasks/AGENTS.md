@@ -15,9 +15,26 @@ These rules govern this repository's live task instance. The bundle directory ho
 9. Where the repository has pull-request checks, they are the required post-PR gate; review comments are handled when the user requests it or repository policy requires it.
 10. A task is completed when the implementation PR merges and archived when its finalized directory exists in the configured archive path on the default branch.
 
+## Operations
+
+Act on these directly when asked. Do not ask which variant to use — there is only one of each. Run the scripts from the repository root with the interpreter recorded in `commands`, and prefer the `commands.*` entries in `config.yaml` over the literal paths below when they are present.
+
+| Ask | Do |
+| --- | --- |
+| "initialize the task system", "set this up" | `python3 .tasks/scripts/init.py`. Safe to re-run: it never overwrites an existing configuration or instruction file. Add `--dry-run` first if the repository state is unclear. |
+| "create a task for X" | `python3 .tasks/scripts/new_task.py --slug <kebab-case> --title "<one line>" --type <type> --original-request "<the request verbatim>"`, then fill the placeholders it lists. |
+| "validate", "is the task system healthy?" | `commands.validate_task_system`, and `commands.validate_bundle` when the bundle itself changed. |
+| "regenerate the index" | `commands.generate_index`. Also required after every status transition. |
+| "upgrade the task system" | Replace the bundle directory with the new one, then `python3 .tasks/scripts/upgrade.py`. |
+| any lifecycle step ("assess", "plan", "implement", "open the PR", "archive") | Follow the Lifecycle section below, updating `task.yaml` and regenerating the index for every transition. |
+
+A fresh task record fails validation until its placeholders are replaced. That is expected, not a defect; finish the artifacts for the current state before reporting the system healthy.
+
 ## Paths
 
 Read the active, archive, template, and index paths from the live instance's `config.yaml`. Never create or modify task records inside `paths.bundle`; the bundle is replaced on upgrade and anything stored there is lost.
+
+`paths.instructions` is always `AGENTS.md` at the repository root.
 
 The branch convention is:
 
@@ -35,12 +52,8 @@ it in the same task that changes the layout or the installed major version.
 
 ## Required artifacts
 
-Task types listed in `lifecycle.lite_profile_task_types` use the lite profile and
-require only `task.yaml`, `task.md`, `findings.md`, `plan.md`, `verification.md`,
-and `completion.md`. Assessment and research findings are folded into
-`findings.md`. Every approval, gate, and traceability rule still applies.
-
-Every other active task contains:
+Every task type requires the same artifacts and passes the same gates. There is
+no reduced profile. An active task contains:
 
 - `task.yaml`
 - `task.md`

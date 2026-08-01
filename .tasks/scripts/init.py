@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 
-from common import replace_path_in_text
+from common import detect_interpreter, replace_path_in_text
 from generate_index import (
     DEFAULT_BUNDLE_ROOT,
     DEFAULT_INSTANCE_ROOT,
@@ -28,18 +27,12 @@ TEMPLATE_ROOT_AGENTS = 'templates/AGENTS.md'
 TASK_SYSTEM_HEADING = '## Task system'
 TEMPLATE_WORKFLOW = 'templates/github/workflows/validate-task-system.yml'
 WORKFLOW_DESTINATION = '.github/workflows/validate-task-system.yml'
-PRUNED_MARKER = '.pruned'
-
-# Removed by --prune-install-files. Everything here is only needed while
-# installing or while developing the bundle itself.
-INSTALL_ONLY_PATHS = (
-    'README.md',
-    'tests',
-    'scripts/init.py',
-    'templates/AGENTS.md',
-    'templates/github',
-    'templates/instance',
-)
+# The only file an agent is directed to read. It is never replaced: the task
+# system appends its section and leaves everything else alone.
+INSTRUCTION_FILE = 'AGENTS.md'
+# Written alongside a newly created instruction file so the repository has a
+# complete example to grow its own AGENTS.md from.
+INSTRUCTION_EXAMPLE_FILE = 'AGENTS.example.md'
 
 
 class InitFailure(Exception):
@@ -117,15 +110,6 @@ def detect_provider(repo_root: Path) -> str:
     return 'github' if 'github.com' in url else 'other'
 
 
-def detect_interpreter() -> str:
-    """Select the platform-appropriate Python interpreter command.
-    
-    Returns:
-    	str: `python` on Windows or `python3` on other platforms.
-    """
-    return 'python' if sys.platform == 'win32' else 'python3'
-
-
 def replace_once(text: str, old: str, new: str, label: str) -> str:
     """
     Replace exactly one occurrence of a required string.
@@ -200,14 +184,16 @@ def render_config(
     text = text.replace('__REQUIRED_REPOSITORY_NAME__', repository_name)
     text = text.replace('__REQUIRED_DEFAULT_BRANCH__', default_branch)
 
-    # Longest first: ".project-tasks" must not be partially rewritten.
+    # Longest first: ".project-tasks" must not be partially rewritten. Replacing at
+    # path boundaries also covers bare occurrences such as `--template-root .tasks`,
+    # which a `.tasks/` prefix replacement would miss.
     if instance != DEFAULT_INSTANCE_ROOT:
-        text = text.replace(DEFAULT_INSTANCE_ROOT, instance)
+        text = replace_path_in_text(text, DEFAULT_INSTANCE_ROOT, instance)
     if bundle != DEFAULT_BUNDLE_ROOT:
-        text = text.replace(f'{DEFAULT_BUNDLE_ROOT}/', f'{bundle}/')
-        text = replace_once(
-            text, f'bundle: "{DEFAULT_BUNDLE_ROOT}"', f'bundle: "{bundle}"', 'config'
-        )
+        marker = f'bundle: "{DEFAULT_BUNDLE_ROOT}"'
+        if text.count(marker) != 1:
+            raise InitFailure(f'config: expected exactly one occurrence of {marker!r}')
+        text = replace_path_in_text(text, DEFAULT_BUNDLE_ROOT, bundle)
     if interpreter != 'python3':
         text = text.replace('python3 ', f'{interpreter} ')
     return text
@@ -250,46 +236,44 @@ def install_instructions(
     bundle: str,
     instance: str,
     interpreter: str,
-    force: bool,
     dry_run: bool,
     actions: list[str],
 ) -> None:
     """
-    Create or update the repository's instruction file while preserving existing content.
-    
+    Append the task-system section to the repository's instruction file.
+
+    The file is created when absent and never replaced, whatever it already
+    contains. Running this twice is a no-op.
+
     Parameters:
         path (Path): Path to the instruction file.
-        template_text (str): Instruction template to render and write.
+        template_text (str): Instruction template to render and append from.
         bundle (str): Bundle path substituted into the template.
         instance (str): Live instance path substituted into the template.
         interpreter (str): Interpreter command substituted into the template.
-        force (bool): Whether to replace an existing nonempty file.
         dry_run (bool): Whether to record actions without writing files.
         actions (list[str]): List to which planned or performed actions are appended.
     """
     rendered = substitute_paths(template_text, bundle, instance, interpreter)
-    existing = path.read_text(encoding='utf-8') if path.is_file() else None
-    # An empty file carries no instructions to preserve, so treat it as absent
-    # rather than appending a lone section onto nothing.
-    if existing is None or not existing.strip():
-        write_file(path, rendered, dry_run, actions)
-        return
-
-    if force:
-        actions.append(f'overwrite {path} (--force)')
-        if not dry_run:
-            path.write_text(rendered, encoding='utf-8', newline='\n')
-        return
-
+    existing = path.read_text(encoding='utf-8') if path.is_file() else ''
     if f'{bundle}/AGENTS.md' in existing:
-        actions.append(f'skip {path} (already references {bundle}/AGENTS.md)')
+        actions.append(f'keep {path} (already references {bundle}/AGENTS.md)')
         return
 
     section = task_system_section(rendered)
     actions.append(f'append {TASK_SYSTEM_HEADING} section to {path}')
     if dry_run:
         return
-    separator = '' if existing.endswith('\n\n') else '\n' if existing.endswith('\n') else '\n\n'
+    if not existing.strip():
+        separator = ''
+        existing = ''
+    elif existing.endswith('\n\n'):
+        separator = ''
+    elif existing.endswith('\n'):
+        separator = '\n'
+    else:
+        separator = '\n\n'
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(existing + separator + section, encoding='utf-8', newline='\n')
 
 
@@ -344,37 +328,6 @@ def main() -> int:
         action='store_true',
         help='Run the lifecycle without requiring green pull-request checks.',
     )
-    parser.add_argument(
-        '--install-root-agents',
-        action='store_true',
-        help=(
-            'Install the agent instruction file. An existing file is appended to, '
-            'never replaced, unless --force is given.'
-        ),
-    )
-    parser.add_argument(
-        '--instruction-file',
-        default='AGENTS.md',
-        help=(
-            'Repository-root instruction file your agent actually reads '
-            '(AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, ...).'
-        ),
-    )
-    parser.add_argument(
-        '--install-workflow',
-        action='store_true',
-        help=f'Write {WORKFLOW_DESTINATION}.',
-    )
-    parser.add_argument(
-        '--prune-install-files',
-        action='store_true',
-        help='Delete install-only files from the bundle after initialization.',
-    )
-    parser.add_argument(
-        '--force',
-        action='store_true',
-        help='Overwrite an existing live configuration and instruction file.',
-    )
     parser.add_argument('--dry-run', action='store_true', help='Report actions only.')
     args = parser.parse_args()
 
@@ -402,11 +355,6 @@ def main() -> int:
             raise InitFailure(f'missing {template_config}')
 
         config_path = instance_root / 'config.yaml'
-        if config_path.exists() and not args.force:
-            raise InitFailure(
-                f'{config_path} already exists; pass --force to overwrite it'
-            )
-
         provider = (
             detect_provider(repo_root) if args.provider == 'auto' else args.provider
         )
@@ -426,44 +374,61 @@ def main() -> int:
             provider=provider,
             github_enabled=github_enabled,
             interpreter=interpreter,
-            instructions=args.instruction_file.replace('\\', '/'),
+            instructions=INSTRUCTION_FILE,
         )
         if '__REQUIRED_' in config_text:
             raise InitFailure('config still contains placeholders after substitution')
-        write_file(config_path, config_text, args.dry_run, actions)
+        # Re-running init must never discard a repository's settings, so an
+        # existing configuration is kept exactly as it is.
+        if config_path.exists():
+            actions.append(f'keep {config_path} (already initialized)')
+        else:
+            write_file(config_path, config_text, args.dry_run, actions)
 
         for area in ('active', 'archive'):
             keep = instance_root / area / '.gitkeep'
-            write_file(keep, '', args.dry_run, actions)
+            if not keep.exists():
+                write_file(keep, '', args.dry_run, actions)
 
-        if args.install_root_agents:
-            root_agents = bundle_root / TEMPLATE_ROOT_AGENTS
-            if not root_agents.is_file():
-                raise InitFailure(f'missing {root_agents}')
-            install_instructions(
-                repo_root / args.instruction_file,
-                root_agents.read_text(encoding='utf-8'),
-                bundle_value,
-                instance_value,
-                interpreter,
-                args.force,
+        root_agents = bundle_root / TEMPLATE_ROOT_AGENTS
+        if not root_agents.is_file():
+            raise InitFailure(f'missing {root_agents}')
+        root_agents_text = root_agents.read_text(encoding='utf-8')
+        instruction_path = repo_root / INSTRUCTION_FILE
+        instruction_existed = instruction_path.is_file()
+        install_instructions(
+            instruction_path,
+            root_agents_text,
+            bundle_value,
+            instance_value,
+            interpreter,
+            args.dry_run,
+            actions,
+        )
+        # A repository without its own AGENTS.md gets the full scaffold as a
+        # separate example rather than as content it did not ask for.
+        if not instruction_existed:
+            write_file(
+                repo_root / INSTRUCTION_EXAMPLE_FILE,
+                substitute_paths(
+                    root_agents_text, bundle_value, instance_value, interpreter
+                ),
                 args.dry_run,
                 actions,
             )
 
-        if args.install_workflow:
-            workflow_template = bundle_root / TEMPLATE_WORKFLOW
-            if not workflow_template.is_file():
-                raise InitFailure(f'missing {workflow_template}')
-            workflow_text = substitute_paths(
-                workflow_template.read_text(encoding='utf-8'),
-                bundle_value,
-                instance_value,
-                interpreter,
-            )
-            write_file(
-                repo_root / WORKFLOW_DESTINATION, workflow_text, args.dry_run, actions
-            )
+        workflow_template = bundle_root / TEMPLATE_WORKFLOW
+        if not workflow_template.is_file():
+            raise InitFailure(f'missing {workflow_template}')
+        workflow_text = substitute_paths(
+            workflow_template.read_text(encoding='utf-8'),
+            bundle_value,
+            instance_value,
+            interpreter,
+        )
+        write_file(
+            repo_root / WORKFLOW_DESTINATION, workflow_text, args.dry_run, actions
+        )
 
         if not args.dry_run:
             index_path, data = build_index(repo_root, instance_root)
@@ -473,24 +438,6 @@ def main() -> int:
         else:
             actions.append(f'write {instance_root / "index.yaml"}')
 
-        if args.prune_install_files:
-            for name in INSTALL_ONLY_PATHS:
-                target = bundle_root / name
-                if not target.exists():
-                    continue
-                actions.append(f'remove {target}')
-                if args.dry_run:
-                    continue
-                if target.is_dir():
-                    shutil.rmtree(target)
-                else:
-                    target.unlink()
-            write_file(
-                bundle_root / PRUNED_MARKER,
-                'Install-only files were removed by scripts/init.py.\n',
-                args.dry_run,
-                actions,
-            )
     except (InitFailure, OSError, ValueError) as exc:
         print(f'Initialization failed: {exc}', file=sys.stderr)
         return 1
@@ -501,14 +448,10 @@ def main() -> int:
     if not args.dry_run:
         print()
         print('Next steps:')
-        if args.install_root_agents:
+        if not instruction_existed:
             print(
-                f'- Replace any remaining __REQUIRED_* values in {args.instruction_file}.'
-            )
-        else:
-            print(
-                f'- Copy {bundle_root / TEMPLATE_ROOT_AGENTS} to {args.instruction_file}, '
-                'or merge its task-system section into your existing agent instructions.'
+                f'- Describe this repository in {INSTRUCTION_FILE}; '
+                f'{INSTRUCTION_EXAMPLE_FILE} shows the full shape.'
             )
         print(f'- Fill in commands.lint/typecheck/unit_test in {config_path}.')
         print(f'- Create a task: {interpreter} {bundle_value}/scripts/new_task.py --help')

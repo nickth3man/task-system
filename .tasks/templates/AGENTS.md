@@ -35,4 +35,16 @@ End-to-end:  __REQUIRED_E2E_COMMAND_OR_NOT_APPLICABLE__
 
 All independently mergeable work follows `.tasks/AGENTS.md` and uses the live configuration in `.project-tasks/config.yaml`. `task.yaml` is authoritative. If repository rules and task-system rules conflict, stop and ask rather than choosing silently.
 
+Read `.tasks/AGENTS.md` before acting on any task-system request. Its Operations section maps each request to the one command that serves it — there are no variants to choose between. The entry points are:
+
+```text
+Initialize:    python3 .tasks/scripts/init.py
+Create a task: python3 .tasks/scripts/new_task.py --slug <kebab-case> --title "<one line>" --type <type>
+Validate:      python3 .tasks/scripts/validate.py --instance-only --template-root .tasks --instance-root .project-tasks
+Rebuild index: python3 .tasks/scripts/generate_index.py --instance-root .project-tasks
+Upgrade:       python3 .tasks/scripts/upgrade.py
+```
+
+Every task type requires the same artifacts and passes the same approval gates.
+
 `.tasks/` is the task-system bundle and is replaced wholesale on upgrade. Never store task records or repository-specific configuration inside it.
