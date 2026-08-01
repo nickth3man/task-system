@@ -28,5 +28,8 @@ jobs:
       - name: Install validation dependencies
         run: python -m pip install -r .tasks/requirements.txt
 
+      - name: Run task-system regression tests
+        run: python -m unittest discover -s .tasks/tests -p "test_*.py" -v
+
       - name: Validate distributable template and live project instance
         run: python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks
