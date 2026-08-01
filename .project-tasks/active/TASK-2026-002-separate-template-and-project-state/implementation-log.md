@@ -122,3 +122,37 @@
 - All eight findings from the second Cubic review pass were addressed.
 - Final reviewed production candidate: `ff5bbdeb076ba1f98d46afaa494c641f56f384a0`.
 - Required workflow run `30674658942` passed.
+
+## 2026-07-31T20:50:00-04:00 — Guard malformed blocker metadata
+
+### Commands
+
+- `python -m py_compile .tasks/scripts/validate.py .tasks/scripts/generate_index.py .tasks/tests/test_tools.py` — passed.
+- `python -m unittest discover -s .tasks/tests -p "test_*.py" -v` — 9 regression tests passed.
+- GitHub Actions workflow `Validate task system` run `30676496878` — passed after the temporary patch workflow was removed.
+
+### Changes
+
+- Guarded both terminal-state membership checks in `validate_blocker()` with `isinstance(value, str)` before set membership.
+- Added `test_malformed_blocker_states_do_not_raise_type_error` with list- and mapping-valued blocker status fields.
+- Removed the temporary one-shot workflow used to apply the exact patch to the PR branch.
+
+### Discoveries
+
+- The schema correctly reports non-string blocker values, but semantic validation continues to collect additional errors. Direct set membership therefore must not assume schema-valid or hashable values.
+
+### Decisions and rejected alternatives
+
+- Decision: preserve error accumulation and make the semantic check type-safe rather than returning early after schema errors.
+- Rejected alternative: changing the terminal-state set to a sequence, because explicit type guards communicate the validation contract and avoid accidental equality checks on arbitrary objects.
+
+### Deviations, failures, and resolutions
+
+- Plan deviation: None; this is a review-driven robustness correction within the approved validator scope.
+- Failure and resolution: The unguarded membership expression could raise `TypeError` for list or mapping values. Commit `c44a23a5cbe3a1b328584c87cf53e3900ebc1c27` adds the guards and regression test; cleanup commit `0aa95eea88f99c98fef59b6a38f6d44a5bfe6f02` removes temporary automation.
+
+### Metrics or evidence
+
+- Regression suite increased from 8 to 9 tests.
+- The Cubic review thread was answered and resolved.
+- Required workflow run `30676496878` passed.
