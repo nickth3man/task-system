@@ -12,6 +12,12 @@ from typing import Any, Iterable
 from jsonschema import Draft202012Validator, FormatChecker
 import yaml
 
+from common import (
+    LITE_REQUIRED_DIRECTORIES,
+    LITE_REQUIRED_FILES,
+    PLACEHOLDER,
+    PLACEHOLDER_RE,
+)
 from generate_index import (
     DEFAULT_BUNDLE_ROOT,
     DEFAULT_INSTANCE_ROOT,
@@ -38,15 +44,6 @@ ACTIVE_REQUIRED_DIRECTORIES = ('evidence/screenshots',)
 # The lite profile folds assessment and research into findings.md and drops the
 # active-only working files. completion.md stays so archived records remain
 # self-describing. Every approval and traceability rule is unchanged.
-LITE_REQUIRED_FILES = (
-    'task.yaml',
-    'task.md',
-    'findings.md',
-    'plan.md',
-    'verification.md',
-    'completion.md',
-)
-LITE_REQUIRED_DIRECTORIES: tuple[str, ...] = ()
 TEMPLATE_REQUIRED_FILES = (
     '.gitignore',
     'AGENTS.md',
@@ -55,6 +52,7 @@ TEMPLATE_REQUIRED_FILES = (
     'requirements.txt',
     'schemas/config.schema.json',
     'schemas/task.schema.json',
+    'scripts/common.py',
     'scripts/validate.py',
     'scripts/generate_index.py',
     'scripts/init.py',
@@ -142,12 +140,10 @@ MERGE_READY_STATES = {
 MERGED_STATES = {'completed', 'archived'}
 
 # A bare `=======` line is also a Markdown setext heading and an ordinary ASCII
-# divider, so it is never sufficient on its own. Only a paired start and end
-# marker identifies an unresolved conflict.
-CONFLICT_START_RE = re.compile(r'(?m)^<<<<<<< \S')
-CONFLICT_END_RE = re.compile(r'(?m)^>>>>>>> \S')
-PLACEHOLDER = '__REQUIRED_'
-PLACEHOLDER_RE = re.compile(r'__REQUIRED_[A-Z0-9_]*__')
+# divider, so it is never sufficient on its own. A start or end marker is enough
+# to identify an unresolved or partially resolved conflict.
+CONFLICT_START_RE = re.compile(r'(?m)^<<<<<<<(?: .*)?$')
+CONFLICT_END_RE = re.compile(r'(?m)^>>>>>>>(?: .*)?$')
 MAX_REPORTED_PLACEHOLDERS = 5
 HEX64 = re.compile(r'^[0-9a-f]{64}$')
 # A root instruction file that still points at these is describing a pre-4.0
@@ -448,6 +444,12 @@ def validate_template(
                 errors,
             )
             if bundle_root is not None:
+                if bundle_root != template_root.resolve(strict=False):
+                    errors.append(
+                        f'{relative(repo_root, config_path)}: paths.bundle must resolve '
+                        f'to the bundle under validation '
+                        f'({relative(repo_root, template_root)})'
+                    )
                 validate_path_layout(repo_root, config_path, paths, bundle_root, errors)
 
     task_template_root = template_root / 'templates/task'
@@ -871,7 +873,7 @@ def validate_merge_readiness(
             errors.append(f'{task_id}: {status} requires passed pull-request checks')
 
     if status in MERGED_STATES:
-        if ci_required and pull_request.get('state') != 'merged':
+        if pull_request.get('state') != 'merged':
             errors.append(f'{task_id}: {status} requires a merged pull request')
         merge = task.get('merge') if isinstance(task.get('merge'), dict) else {}
         for field in ('commit_sha', 'merged_at', 'merged_by'):
@@ -1075,7 +1077,14 @@ def validate_instructions(
         )
         return
 
-    text = instructions_path.read_text(encoding='utf-8')
+    try:
+        text = instructions_path.read_text(encoding='utf-8')
+    except (UnicodeDecodeError, OSError) as exc:
+        errors.append(
+            f'unreadable agent instruction file {label}: {exc}; the task system '
+            'cannot be validated'
+        )
+        return
     bundle = relative(repo_root, bundle_root)
     instance = relative(repo_root, instance_root)
 
@@ -1096,7 +1105,7 @@ def validate_instructions(
 
     for name in REMOVED_BUNDLE_PATHS:
         stale = f'{bundle}/{name}'
-        if stale in text:
+        if re.search(rf'(?<![\w./-]){re.escape(stale)}(?=$|[^\w./-])', text):
             errors.append(
                 f'{label} references {stale}, which no longer exists; live state '
                 f'moved to {instance}'
@@ -1173,14 +1182,13 @@ def validate_instance(
         f'{relative(repo_root, config_path)}: paths.bundle',
         errors,
     )
-    if bundle_root is None:
-        return
-    if not bundle_root.is_dir():
-        errors.append(
-            f'{relative(repo_root, config_path)}: paths.bundle does not exist: '
-            f'{relative(repo_root, bundle_root)}'
-        )
-    validate_path_layout(repo_root, config_path, paths, bundle_root, errors)
+    if bundle_root is not None:
+        if not bundle_root.is_dir():
+            errors.append(
+                f'{relative(repo_root, config_path)}: paths.bundle does not exist: '
+                f'{relative(repo_root, bundle_root)}'
+            )
+        validate_path_layout(repo_root, config_path, paths, bundle_root, errors)
 
     instructions_path = configured_path(
         repo_root,
@@ -1188,7 +1196,7 @@ def validate_instance(
         f'{relative(repo_root, config_path)}: paths.instructions',
         errors,
     )
-    if instructions_path is not None:
+    if instructions_path is not None and bundle_root is not None:
         version_file = bundle_root / 'VERSION'
         installed_version = (
             version_file.read_text(encoding='utf-8').strip()
@@ -1278,7 +1286,7 @@ def scan_conflicts(repo_root: Path, roots: Iterable[Path], errors: list[str]) ->
                 text = path.read_text(encoding='utf-8')
             except (UnicodeDecodeError, OSError):
                 continue
-            if CONFLICT_START_RE.search(text) and CONFLICT_END_RE.search(text):
+            if CONFLICT_START_RE.search(text) or CONFLICT_END_RE.search(text):
                 errors.append(
                     f'{relative(repo_root, path)} contains an unresolved merge-conflict marker'
                 )

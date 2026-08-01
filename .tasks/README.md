@@ -103,12 +103,20 @@ gate, and traceability rule is unchanged; only the file count drops. Set it to
 
 ## Upgrade
 
-Replace the `.tasks/` directory with the newer bundle, then:
+**Pre-4.0 installations keep live state inside `.tasks/`.** Do not delete or
+replace `.tasks/` before running `upgrade.py`, or that state is lost. Copy the
+new bundle to a temporary location (e.g. `.tasks-new/`) and run:
 
 ```bash
-python3 .tasks/scripts/upgrade.py --dry-run   # see the plan
-python3 .tasks/scripts/upgrade.py
+python3 .tasks-new/scripts/upgrade.py --bundle-root .tasks-new --dry-run   # see the plan
+python3 .tasks-new/scripts/upgrade.py --bundle-root .tasks-new
 ```
+
+Once the upgrade completes, live state has moved to `.project-tasks/` and it is
+safe to replace `.tasks/` with the new bundle.
+
+4.0-or-later installations keep no live state in the bundle, so simply replace
+`.tasks/` and re-run `upgrade.py`:
 
 `upgrade.py` moves live state out of the bundle if a pre-4.0 installation kept it
 there, adds configuration keys the new version requires, rewrites paths and
@@ -140,5 +148,5 @@ python3 .tasks/scripts/validate.py --instance-only --instance-root .project-task
 python3 .tasks/scripts/generate_index.py --instance-root .project-tasks
 ```
 
-The validator reads only the bundle and the instance directory. It does not scan
-the rest of the repository.
+The validator reads only the bundle, the instance directory, and the configured
+root-level instruction file. It does not scan the rest of the repository.

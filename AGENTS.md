@@ -12,7 +12,7 @@
 ```text
 .tasks/                          — the bundle; copy this directory into other projects
 .tasks/AGENTS.md                 — generic lifecycle rules installed with the bundle
-.tasks/scripts/                  — installer, validator, and index generator
+.tasks/scripts/                  — initializer, task creator, upgrader, validator, and index generator
 .tasks/schemas/                  — bundled JSON Schemas
 .tasks/templates/                — task, instance config, root AGENTS.md, and workflow templates
 .tasks/tests/                    — regression tests for the bundled tools

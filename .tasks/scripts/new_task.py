@@ -13,9 +13,11 @@ from pathlib import Path
 import re
 import shutil
 import sys
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 
+from common import PLACEHOLDER_RE
 from generate_index import (
     DEFAULT_INSTANCE_ROOT,
     build_index,
@@ -24,18 +26,16 @@ from generate_index import (
     repo_path,
 )
 
+from common import LITE_REQUIRED_FILES as LITE_FILES
+
 TASK_ID_RE = re.compile(r'^(?P<prefix>[A-Z]+)-(?P<year>\d{4})-(?P<sequence>\d+)$')
 SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-PLACEHOLDER_RE = re.compile(r'__REQUIRED_[A-Z0-9_]*__')
 TASK_TYPES = (
     'feature', 'bugfix', 'refactor', 'performance', 'security', 'audit',
     'research', 'documentation', 'dependency', 'data', 'ui_ux', 'scaffolding',
     'other',
 )
-# Mirrors validate.LITE_REQUIRED_FILES.
-LITE_FILES = (
-    'task.yaml', 'task.md', 'findings.md', 'plan.md', 'verification.md', 'completion.md',
-)
+
 
 
 class TaskFailure(Exception):
@@ -53,11 +53,11 @@ def timestamp(timezone: str) -> str:
     	str: Timestamp with seconds precision and a numeric UTC offset; uses the system-local timezone when the requested timezone is unavailable.
     """
     try:
-        from zoneinfo import ZoneInfo
-
         return datetime.now(ZoneInfo(timezone)).isoformat(timespec='seconds')
-    except Exception:
+    except (ZoneInfoNotFoundError, ValueError) as exc:
         # Windows has no system tz database unless `tzdata` is installed.
+        print(f'warning: timezone {timezone!r} unusable ({exc}); using local offset',
+              file=sys.stderr)
         return datetime.now().astimezone().isoformat(timespec='seconds')
 
 
@@ -79,6 +79,8 @@ def existing_ids(*roots: Path) -> set[str]:
             try:
                 data = load_yaml(task_file)
             except ValueError:
+                continue
+            if not isinstance(data, dict):
                 continue
             value = data.get('id')
             if isinstance(value, str):
@@ -150,6 +152,17 @@ def substitutions(
         'REPOSITORY_NAME': str(repository.get('name', '')),
         'DEFAULT_BRANCH': str(repository.get('default_branch', '')),
     }
+
+
+def yaml_scalar(value: str) -> str:
+    """Escape a value for insertion into a double-quoted YAML scalar."""
+    return (
+        value.replace('\\', '\\\\')
+        .replace('"', '\\"')
+        .replace('\n', '\\n')
+        .replace('\r', '\\r')
+        .replace('\t', '\\t')
+    )
 
 
 def apply(text: str, values: dict[str, str]) -> str:
@@ -255,6 +268,7 @@ def main() -> int:
 
     repo_root = Path(args.repo_root).resolve(strict=False)
     instance_root = repo_path(repo_root, args.instance_root).resolve(strict=False)
+    created_task_dir: Path | None = None
 
     try:
         if not SLUG_RE.match(args.slug):
@@ -268,9 +282,15 @@ def main() -> int:
         paths = config.get('paths')
         if not isinstance(paths, dict):
             raise TaskFailure(f'{config_path}: paths must be a mapping')
-        active_root = repo_path(repo_root, str(paths.get('active'))).resolve(strict=False)
-        archive_root = repo_path(repo_root, str(paths.get('archive'))).resolve(strict=False)
-        template_root = repo_path(repo_root, str(paths.get('template'))).resolve(strict=False)
+        resolved: dict[str, Path] = {}
+        for key in ('active', 'archive', 'template'):
+            value = paths.get(key)
+            if not isinstance(value, str) or not value.strip():
+                raise TaskFailure(f'{config_path}: paths.{key} must be a non-empty string')
+            resolved[key] = repo_path(repo_root, value).resolve(strict=False)
+        active_root = resolved['active']
+        archive_root = resolved['archive']
+        template_root = resolved['template']
         if not template_root.is_dir():
             raise TaskFailure(f'task template not found: {template_root}')
 
@@ -278,7 +298,7 @@ def main() -> int:
         now = timestamp(timezone if isinstance(timezone, str) else 'UTC')
         taken = existing_ids(active_root, archive_root)
 
-        task_id = args.id or allocate_id(config, taken, datetime.now().year)
+        task_id = args.id or allocate_id(config, taken, int(now[:4]))
         if not TASK_ID_RE.match(task_id):
             raise TaskFailure(f'malformed task ID: {task_id}')
         if task_id in taken:
@@ -303,20 +323,29 @@ def main() -> int:
             print(f'Would create {task_dir} from {template_root}')
             return 0
 
+        created_task_dir = task_dir
         shutil.copytree(template_root, task_dir)
+        yaml_values = {k: yaml_scalar(v) for k, v in values.items()}
         for path in sorted(task_dir.rglob('*')):
             if not path.is_file() or path.suffix not in {'.md', '.yaml'}:
                 continue
+            applicable = yaml_values if path.suffix == '.yaml' else values
             path.write_text(
-                apply(path.read_text(encoding='utf-8'), values),
+                apply(path.read_text(encoding='utf-8'), applicable),
                 encoding='utf-8',
                 newline='\n',
             )
 
         task_file = task_dir / 'task.yaml'
         task = task_file.read_text(encoding='utf-8')
-        task = task.replace('type: "feature"', f'type: "{args.type}"', 1)
+        marker = 'type: "feature"'
+        if marker not in task:
+            raise TaskFailure(f'{task_file}: expected {marker!r} to set the task type')
+        task = task.replace(marker, f'type: "{args.type}"', 1)
         task_file.write_text(task, encoding='utf-8', newline='\n')
+
+        # Verify the written task.yaml parses cleanly before committing.
+        load_yaml(task_file)
 
         lite = args.type in lite_profile_types(config)
         pruned = prune_to_lite(task_dir) if lite else []
@@ -325,6 +354,9 @@ def main() -> int:
         index_path.parent.mkdir(parents=True, exist_ok=True)
         index_path.write_text(render(data), encoding='utf-8', newline='\n')
     except (TaskFailure, OSError, ValueError, yaml.YAMLError) as exc:
+        if created_task_dir is not None and created_task_dir.exists():
+            shutil.rmtree(created_task_dir, ignore_errors=True)
+            print(f'Removed partial task directory {created_task_dir}', file=sys.stderr)
         print(f'Task creation failed: {exc}', file=sys.stderr)
         return 1
 

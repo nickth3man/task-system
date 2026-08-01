@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 
+from common import replace_path_in_text
 from generate_index import (
     DEFAULT_BUNDLE_ROOT,
     DEFAULT_INSTANCE_ROOT,
@@ -225,9 +226,9 @@ def substitute_paths(text: str, bundle: str, instance: str, interpreter: str) ->
         str: Text containing the configured paths and interpreter references.
     """
     if instance != DEFAULT_INSTANCE_ROOT:
-        text = text.replace(DEFAULT_INSTANCE_ROOT, instance)
+        text = replace_path_in_text(text, DEFAULT_INSTANCE_ROOT, instance)
     if bundle != DEFAULT_BUNDLE_ROOT:
-        text = text.replace(DEFAULT_BUNDLE_ROOT, bundle)
+        text = replace_path_in_text(text, DEFAULT_BUNDLE_ROOT, bundle)
     if interpreter != 'python3':
         text = text.replace('python3 ', f'{interpreter} ')
     return text
@@ -436,9 +437,12 @@ def main() -> int:
             write_file(keep, '', args.dry_run, actions)
 
         if args.install_root_agents:
+            root_agents = bundle_root / TEMPLATE_ROOT_AGENTS
+            if not root_agents.is_file():
+                raise InitFailure(f'missing {root_agents}')
             install_instructions(
                 repo_root / args.instruction_file,
-                (bundle_root / TEMPLATE_ROOT_AGENTS).read_text(encoding='utf-8'),
+                root_agents.read_text(encoding='utf-8'),
                 bundle_value,
                 instance_value,
                 interpreter,
@@ -448,8 +452,11 @@ def main() -> int:
             )
 
         if args.install_workflow:
+            workflow_template = bundle_root / TEMPLATE_WORKFLOW
+            if not workflow_template.is_file():
+                raise InitFailure(f'missing {workflow_template}')
             workflow_text = substitute_paths(
-                (bundle_root / TEMPLATE_WORKFLOW).read_text(encoding='utf-8'),
+                workflow_template.read_text(encoding='utf-8'),
                 bundle_value,
                 instance_value,
                 interpreter,

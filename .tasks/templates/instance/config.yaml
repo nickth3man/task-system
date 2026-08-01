@@ -60,7 +60,7 @@ commands:
   end_to_end_test: null
   build: null
   validate_bundle: "python3 .tasks/scripts/validate.py --template-only --template-root .tasks"
-  validate_task_system: "python3 .tasks/scripts/validate.py --instance-only --instance-root .project-tasks"
+  validate_task_system: "python3 .tasks/scripts/validate.py --instance-only --template-root .tasks --instance-root .project-tasks"
   generate_index: "python3 .tasks/scripts/generate_index.py --instance-root .project-tasks"
 
 concurrency:

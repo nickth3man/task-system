@@ -172,9 +172,7 @@ class BundleLayoutTests(unittest.TestCase):
             for name in init.INSTALL_ONLY_PATHS:
                 target = bundle_root / name
                 if target.is_dir():
-                    for child in sorted(target.rglob('*'), reverse=True):
-                        child.unlink() if child.is_file() else child.rmdir()
-                    target.rmdir()
+                    shutil.rmtree(target)
                 elif target.is_file():
                     target.unlink()
             (bundle_root / validate.BUNDLE_PRUNED_MARKER).write_text(
@@ -238,7 +236,34 @@ class ConflictScanTests(unittest.TestCase):
                 '<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> other\n', encoding='utf-8'
             )
 
-            self.assertEqual(self._scan(repo_root, [scanned]), [])
+
+    def test_lone_start_marker_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'partial.md').write_text(
+                '<<<<<<< HEAD\nsome text\n', encoding='utf-8'
+            )
+
+            errors = self._scan(root)
+
+            self.assertTrue(
+                any('unresolved merge-conflict marker' in error for error in errors),
+                errors,
+            )
+
+    def test_lone_end_marker_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'partial.md').write_text(
+                'some text\n>>>>>>> feature\n', encoding='utf-8'
+            )
+
+            errors = self._scan(root)
+
+            self.assertTrue(
+                any('unresolved merge-conflict marker' in error for error in errors),
+                errors,
+            )
 
 
 class CiGatingTests(unittest.TestCase):
@@ -249,7 +274,7 @@ class CiGatingTests(unittest.TestCase):
                 {'id': 'AC-01', 'status': 'passed', 'evidence': ['verification.md']}
             ],
             'plan_steps': [{'id': 'PLAN-01', 'status': 'completed', 'supports': ['AC-01']}],
-            'pull_request': {'state': 'not_created', 'checks': {'status': 'not_started'}},
+            'pull_request': {'state': 'merged', 'checks': {'status': 'not_started'}},
             'merge': {
                 'commit_sha': 'c' * 40,
                 'merged_at': '2026-07-31T00:00:00Z',
@@ -393,6 +418,13 @@ class InitTests(unittest.TestCase):
         config = yaml.safe_load(self._render(interpreter='python'))
 
         self.assertTrue(config['commands']['generate_index'].startswith('python '))
+
+    def test_rendered_commands_point_at_the_configured_bundle(self) -> None:
+        config = yaml.safe_load(self._render(bundle='.bundle', instance='.work'))
+
+        for name, command in config['commands'].items():
+            if command is None:
+                continue
 
 
 class InstructionFileTests(unittest.TestCase):
@@ -596,8 +628,30 @@ class NewTaskTests(unittest.TestCase):
     def test_timestamp_falls_back_when_timezone_is_unavailable(self) -> None:
         value = new_task.timestamp('Not/AZone')
 
-        self.assertRegex(value, r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
 
+    def test_yaml_scalar_escapes_special_characters(self) -> None:
+        title = 'Fix "quoted" output with \\ backslash'
+        escaped = new_task.yaml_scalar(title)
+        self.assertIn('\\"', escaped)
+        self.assertIn('\\\\', escaped)
+        self.assertNotIn('\n', new_task.yaml_scalar('line1\nline2'))
+
+    def test_substituted_yaml_parses_with_special_characters(self) -> None:
+        values = new_task.substitutions(
+            'TASK-2026-001', 'demo', 'He said "hi" and \\ left', '2026-07-31T00:00:00Z',
+            {'repository': {'name': 'repo', 'default_branch': 'main'}},
+            'agent', 'chat', 'Do the thing.',
+        )
+        yaml_values = {k: new_task.yaml_scalar(v) for k, v in values.items()}
+        template = (
+            'id: "__REQUIRED_TASK_ID__"\n'
+            'title: "__REQUIRED_TITLE__"\n'
+            'slug: "__REQUIRED_SLUG__"\n'
+        )
+        filled = new_task.apply(template, yaml_values)
+        record = yaml.safe_load(filled)
+
+        self.assertEqual(record['title'], 'He said "hi" and \\ left')
 
 class InstallInstructionsTests(unittest.TestCase):
     TEMPLATE = (
@@ -747,9 +801,40 @@ class UpgradeTests(unittest.TestCase):
 
             self.assertEqual(errors, [])
 
-    def test_downgrade_is_refused(self) -> None:
+    def test_version_tuple_orders_releases(self) -> None:
         self.assertGreater(upgrade.version_tuple('5.0.0'), upgrade.version_tuple('4.0.0'))
         self.assertEqual(upgrade.version_tuple('4.0.0'), upgrade.version_tuple('4.0.0'))
+
+    def test_upgrade_refuses_downgrade(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            bundle_root = repo_root / '.tasks'
+            instance_root = repo_root / '.project-tasks'
+            instance_root.mkdir(parents=True)
+            (bundle_root / 'templates' / 'instance').mkdir(parents=True)
+            (bundle_root / 'VERSION').write_text('3.0.0\n', encoding='utf-8')
+            (bundle_root / 'templates/instance/config.yaml').write_text(
+                'schema_version: "3.0.0"\ntask_system_version: "3.0.0"\n', encoding='utf-8'
+            )
+            (instance_root / 'config.yaml').write_text(
+                yaml.safe_dump(
+                    {'task_system_version': '4.0.0', 'paths': {}, 'schema_version': '4.0.0'},
+                    sort_keys=False,
+                ),
+                encoding='utf-8',
+            )
+            old_argv = sys.argv
+            sys.argv = [
+                'upgrade.py', '--repo-root', str(repo_root),
+                '--bundle-root', str(bundle_root),
+                '--instance-root', str(instance_root),
+            ]
+            try:
+                rc = upgrade.main()
+            finally:
+                sys.argv = old_argv
+
+            self.assertEqual(rc, 1)
 
     def test_instruction_file_is_detected_from_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

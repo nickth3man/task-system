@@ -11,6 +11,7 @@ It never edits task records, and it never changes a value you already set.
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -18,6 +19,7 @@ from typing import Any
 
 import yaml
 
+from common import detect_interpreter
 from generate_index import (
     DEFAULT_BUNDLE_ROOT,
     DEFAULT_INSTANCE_ROOT,
@@ -90,8 +92,10 @@ def locate_config(bundle_root: Path, instance_root: Path) -> tuple[Path, bool]:
     if current.is_file():
         return current, False
     legacy = bundle_root / 'config.yaml'
-    if legacy.is_file() and load_yaml(legacy).get('mode') == 'live':
-        return legacy, True
+    if legacy.is_file():
+        legacy_config = load_yaml(legacy)
+        if isinstance(legacy_config, dict) and legacy_config.get('mode') == 'live':
+            return legacy, True
     raise UpgradeFailure(
         f'no live configuration at {current} or {legacy}; run scripts/init.py to '
         'install the task system first'
@@ -123,10 +127,18 @@ def missing_keys(
     for key, value in template.items():
         path = (*trail, str(key))
         if key not in live:
-            found.append((path, UPGRADE_DEFAULTS.get(path, value)))
+            found.append((path, _upgrade_value(path, value)))
         else:
             found.extend(missing_keys(value, live[key], path))
     return found
+
+def _upgrade_value(path: tuple[str, ...], value: Any) -> Any:
+    """Apply UPGRADE_DEFAULTS at this path and at every path below it."""
+    if path in UPGRADE_DEFAULTS:
+        return UPGRADE_DEFAULTS[path]
+    if isinstance(value, dict):
+        return {key: _upgrade_value((*path, str(key)), item) for key, item in value.items()}
+    return value
 
 
 def assign(config: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
@@ -213,8 +225,23 @@ def rewrite_commands(
             continue
         updated = value
         for old in (f'{bundle}/active', f'{bundle}/archive', f'{bundle}/index.yaml'):
-            updated = updated.replace(old, instance + old[len(bundle):])
-        updated = updated.replace(f'--instance-root {bundle}', f'--instance-root {instance}')
+            old_normalized = old.replace('\\', '/')
+            if old_normalized not in updated:
+                continue
+            old_instance = instance + old_normalized[len(bundle):]
+            # Only replace at a path boundary, and skip commands already
+            # pointing at the instance.
+            if old_instance in updated:
+                continue
+            pattern = re.compile(
+                rf'(?<![A-Za-z0-9_.-]){re.escape(old_normalized)}(?=$|[/\\]|[\s"\'`,;])'
+            )
+            updated = pattern.sub(old_instance, updated)
+        updated = re.sub(
+            rf'(--instance-root ){re.escape(bundle)}(?=$|[/\\]|[\s"\'`,;])',
+            rf'\g<1>{instance}',
+            updated,
+        )
         if updated != value:
             commands[key] = updated
             changed.append(f'commands.{key}')
@@ -257,8 +284,6 @@ def repair_instructions(
     Returns:
         tuple[str, list[str]]: The repaired instruction text and descriptions of the changes made.
     """
-    import re
-
     bundle = posix(repo_root, bundle_root)
     instance = posix(repo_root, instance_root)
     changed: list[str] = []
@@ -269,7 +294,9 @@ def repair_instructions(
             updated = updated.replace(stale, f'{instance}/{name}')
             changed.append(f'{stale} -> {instance}/{name}')
 
-    pattern = re.compile(r'(task[ -]system version[^0-9]{0,12})(\d+\.\d+\.\d+)', re.IGNORECASE)
+    pattern = re.compile(
+        r'(task[ -]system version[^\S\n]{0,12})(\d+\.\d+\.\d+)', re.IGNORECASE
+    )
 
     def replace(match: re.Match[str]) -> str:
         """
@@ -330,19 +357,27 @@ def main() -> int:
 
         config_path, legacy = locate_config(bundle_root, instance_root)
         config = load_yaml(config_path)
+        if not isinstance(config, dict):
+            raise UpgradeFailure(f'{config_path}: configuration must be a mapping')
         current = str(config.get('task_system_version', '0.0.0'))
+
         if version_tuple(current) > version_tuple(installed):
             raise UpgradeFailure(
                 f'installed records are version {current}, newer than the bundle '
                 f'({installed}); this tool does not downgrade'
             )
-        if version_tuple(current) == version_tuple(installed) and not legacy:
+        stranded = [
+            name for name in LEGACY_BUNDLE_ENTRIES if (bundle_root / name).exists()
+        ]
+        if version_tuple(current) == version_tuple(installed) and not legacy and not stranded:
             print(f'Already at version {installed}. Nothing to upgrade.')
             return 0
 
         moves: list[tuple[Path, Path]] = []
-        if legacy:
-            for name in LEGACY_BUNDLE_ENTRIES:
+        if legacy or stranded:
+            # config.yaml moves last so an interrupted run still reports legacy.
+            ordered = [n for n in LEGACY_BUNDLE_ENTRIES if n != 'config.yaml'] + ['config.yaml']
+            for name in ordered:
                 source = bundle_root / name
                 if not source.exists():
                     continue
@@ -353,15 +388,20 @@ def main() -> int:
                 actions.append(f'move {posix(repo_root, source)} -> {posix(repo_root, destination)}')
             config_path = instance_root / 'config.yaml'
 
+        # Set paths that depend on the actual installation before missing_keys,
+        # so the real values are preserved rather than the template defaults.
+        paths = config.get('paths')
+        if not isinstance(paths, dict):
+            paths = {}
+            config['paths'] = paths
+        if 'bundle' not in paths:
+            paths['bundle'] = posix(repo_root, bundle_root)
+        if 'instructions' not in paths:
+            paths['instructions'] = detect_instruction_file(repo_root)
         added = missing_keys(template, config)
         for path, value in added:
             assign(config, path, value)
             actions.append(f'add {".".join(path)} = {value!r}')
-
-        if 'bundle' not in config.get('paths', {}):
-            assign(config, ('paths', 'bundle'), posix(repo_root, bundle_root))
-        if 'instructions' not in config.get('paths', {}):
-            assign(config, ('paths', 'instructions'), detect_instruction_file(repo_root))
 
         for note in rewrite_paths(config, repo_root, bundle_root, instance_root):
             actions.append(f'rewrite {note}')
@@ -423,8 +463,9 @@ def main() -> int:
     print()
     print('Comments in config.yaml were not preserved; the previous file is kept as')
     print(f'{posix(repo_root, config_path)}.bak. Review the diff, then validate:')
+    interpreter = detect_interpreter()
     print(
-        f'  python3 {posix(repo_root, bundle_root)}/scripts/validate.py '
+        f'  {interpreter} {posix(repo_root, bundle_root)}/scripts/validate.py '
         f'--instance-only --instance-root {posix(repo_root, instance_root)}'
     )
     return 0

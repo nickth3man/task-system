@@ -1,7 +1,7 @@
 name: Validate task system
 
-# Only runs when task records or the bundle change, so it stays out of the way
-# of the host project's own pipelines.
+# Runs on every pull request so the check always reports a conclusion, but
+# skips push runs when no task files changed.
 on:
   push:
     paths:
@@ -9,10 +9,6 @@ on:
       - ".project-tasks/**"
       - ".github/workflows/validate-task-system.yml"
   pull_request:
-    paths:
-      - ".tasks/**"
-      - ".project-tasks/**"
-      - ".github/workflows/validate-task-system.yml"
 
 permissions:
   contents: read
@@ -28,4 +24,4 @@ jobs:
           cache: pip
           cache-dependency-path: .tasks/requirements.txt
       - run: python3 -m pip install -r .tasks/requirements.txt
-      - run: python3 .tasks/scripts/validate.py --instance-only --instance-root .project-tasks
+      - run: python3 .tasks/scripts/validate.py --instance-only --template-root .tasks --instance-root .project-tasks
