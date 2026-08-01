@@ -5,9 +5,9 @@ slug: separate-template-and-project-state
 title: Separate distributable template from project task state
 type: refactor
 status: awaiting_merge_approval
-status_reason: All requested review findings are addressed and the required workflow passed on the reviewed production candidate; awaiting user merge approval
+status_reason: All review findings from both remediation cycles are addressed and the required workflow passed on the reviewed production candidate; awaiting user merge approval
 created_at: '2026-07-31T18:34:00-04:00'
-updated_at: '2026-07-31T19:16:00-04:00'
+updated_at: '2026-07-31T20:12:00-04:00'
 repository:
   name: task-system
   default_branch: main
@@ -61,11 +61,11 @@ approvals:
     artifact_sha256: null
     task_revision: 1
     findings_revision: 1
-    head_sha: e126fe42680b04d4a7cb33e0d7a7cdfad3b83d15
+    head_sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
     approved_by: user
-    approved_at: '2026-07-31T19:10:00-04:00'
+    approved_at: '2026-07-31T20:00:00-04:00'
     source: chat
-    evidence: User explicitly requested that all review comments be addressed and the existing pull request be updated.
+    evidence: User again explicitly requested that all review comments be addressed and the existing pull request be updated.
   merge:
     status: pending
     revision: null
@@ -82,7 +82,8 @@ acceptance_criteria:
   status: passed
   evidence:
   - .tasks/config.yaml remains a pristine template with explicit template-only and instance-only validation commands
-  - .tasks contains bundled scripts, requirements, schemas, templates, and empty distributable live-state directories
+  - .tasks contains bundled scripts, requirements, schemas, templates, regression tests, and empty distributable live-state directories
+  - .tasks/index.yaml is the exact deterministic empty generated view
 - id: AC-02
   status: passed
   evidence:
@@ -93,12 +94,14 @@ acceptance_criteria:
   status: passed
   evidence:
   - .tasks/scripts/validate.py supports separate template-only, instance-only, same-root, and dual-root validation
-  - Semantic validation covers lifecycle transitions, approval binding, path containment, artifacts, traceability, and merge readiness
-  - .tasks/scripts/generate_index.py validates path containment and reports malformed input cleanly
+  - Semantic validation covers lifecycle transitions, blocked-state resumption, approval binding, PR/candidate head consistency, path and symlink containment, artifacts, traceability, generated-index exactness, and merge readiness
+  - .tasks/scripts/generate_index.py requires version metadata, rejects task-file escapes, and reports malformed input cleanly
+  - .tasks/tests/test_tools.py contains eight targeted regression tests
 - id: AC-04
   status: passed
   evidence:
-  - GitHub Actions workflow Validate task system run 30672665593 passed on candidate e126fe42680b04d4a7cb33e0d7a7cdfad3b83d15
+  - GitHub Actions workflow Validate task system run 30674658942 passed on candidate ff5bbdeb076ba1f98d46afaa494c641f56f384a0
+  - Source and adopter workflows run regression tests before semantic validation
 - id: AC-05
   status: passed
   evidence:
@@ -246,6 +249,71 @@ state_history:
   to: awaiting_merge_approval
   actor: agent
   reason: Required workflow passed on production candidate e126fe42680b04d4a7cb33e0d7a7cdfad3b83d15
+- at: '2026-07-31T20:00:00-04:00'
+  from: awaiting_merge_approval
+  to: implementing
+  actor: agent
+  reason: User requested remediation of the second review pass
+- at: '2026-07-31T20:01:00-04:00'
+  from: implementing
+  to: testing
+  actor: agent
+  reason: Eight targeted validator and index regression scenarios were implemented and exercised
+- at: '2026-07-31T20:02:00-04:00'
+  from: testing
+  to: committing
+  actor: agent
+  reason: Local compilation and all eight regression tests passed
+- at: '2026-07-31T20:03:00-04:00'
+  from: committing
+  to: reviewing
+  actor: agent
+  reason: Second remediation candidate was committed and reviewed
+- at: '2026-07-31T20:04:00-04:00'
+  from: reviewing
+  to: pushing
+  actor: agent
+  reason: Same-agent review passed for validator, index generator, tests, and workflows
+- at: '2026-07-31T20:05:00-04:00'
+  from: pushing
+  to: waiting_for_ci
+  actor: agent
+  reason: Second remediation commits were pushed to the existing pull request
+- at: '2026-07-31T20:06:00-04:00'
+  from: waiting_for_ci
+  to: implementing
+  actor: agent
+  reason: CI correctly identified that the checked-in template index was not the exact generated view
+- at: '2026-07-31T20:07:00-04:00'
+  from: implementing
+  to: testing
+  actor: agent
+  reason: Template index was regenerated and the full validation suite was rerun
+- at: '2026-07-31T20:08:00-04:00'
+  from: testing
+  to: committing
+  actor: agent
+  reason: Regression tests and semantic validation passed after index normalization
+- at: '2026-07-31T20:09:00-04:00'
+  from: committing
+  to: reviewing
+  actor: agent
+  reason: Final second-remediation candidate was committed and reviewed
+- at: '2026-07-31T20:10:00-04:00'
+  from: reviewing
+  to: pushing
+  actor: agent
+  reason: Final same-agent review passed
+- at: '2026-07-31T20:11:00-04:00'
+  from: pushing
+  to: waiting_for_ci
+  actor: agent
+  reason: Final second-remediation candidate was pushed
+- at: '2026-07-31T20:12:00-04:00'
+  from: waiting_for_ci
+  to: awaiting_merge_approval
+  actor: agent
+  reason: Required workflow run 30674658942 passed on candidate ff5bbdeb076ba1f98d46afaa494c641f56f384a0
 git:
   commits:
   - sha: ab166a02be48109a18ea5623681e8748a7d7ff74
@@ -256,28 +324,40 @@ git:
     subject: 'TASK-2026-002: address PR review findings'
   - sha: e126fe42680b04d4a7cb33e0d7a7cdfad3b83d15
     subject: 'TASK-2026-002: complete correction-loop validation'
+  - sha: 69761e0c70d577c48ac4aba15eb7b18e86f0e290
+    subject: 'TASK-2026-002: add validator regression tests'
+  - sha: 23881546898f7385883e596d25c4f020403d838f
+    subject: 'TASK-2026-002: harden index generation'
+  - sha: 116627d0f102060f2095dbe128d547b5c645a047
+    subject: 'TASK-2026-002: enforce validator lifecycle invariants'
+  - sha: b085bc0a475714d2c8b7aad783c8189bab447920
+    subject: 'TASK-2026-002: run validator regression tests in CI'
+  - sha: c8bee0b2ca47c7ffedc62579fee52cc0238df077
+    subject: 'TASK-2026-002: include regression tests in adopter workflow'
+  - sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
+    subject: 'TASK-2026-002: normalize generated template index'
   pushed: true
   remote: origin
-  candidate_head_sha: e126fe42680b04d4a7cb33e0d7a7cdfad3b83d15
-  head_sha: e126fe42680b04d4a7cb33e0d7a7cdfad3b83d15
-  pushed_at: '2026-07-31T19:15:00-04:00'
+  candidate_head_sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
+  head_sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
+  pushed_at: '2026-07-31T20:11:00-04:00'
 pull_request:
   state: open
   number: 2
   url: https://github.com/nickth3man/task-system/pull/2
   base_branch: main
   head_branch: task/TASK-2026-002-separate-template-and-project-state
-  head_sha: e126fe42680b04d4a7cb33e0d7a7cdfad3b83d15
+  head_sha: ff5bbdeb076ba1f98d46afaa494c641f56f384a0
   created_at: '2026-07-31T22:45:48Z'
   checks:
     status: passed
-    last_polled_at: '2026-07-31T19:16:00-04:00'
+    last_polled_at: '2026-07-31T20:12:00-04:00'
     required:
     - Validate task system
     results:
     - name: Validate task system
       status: passed
-      url: https://github.com/nickth3man/task-system/actions/runs/30672665593
+      url: https://github.com/nickth3man/task-system/actions/runs/30674658942
 merge:
   strategy: repository_policy
   commit_sha: null
