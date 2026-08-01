@@ -17,6 +17,18 @@ DEFAULT_INSTANCE_ROOT = '.project-tasks'
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
+    """
+    Load a YAML mapping from a file.
+    
+    Parameters:
+    	path (Path): Path to the YAML file.
+    
+    Returns:
+    	dict[str, Any]: Parsed YAML mapping.
+    
+    Raises:
+    	ValueError: If the file contains invalid YAML or does not contain a mapping.
+    """
     try:
         with path.open('r', encoding='utf-8') as handle:
             data = yaml.safe_load(handle)
@@ -122,6 +134,13 @@ def render(data: dict[str, Any]) -> str:
 
 
 def main() -> int:
+    """
+    Generate the task index or verify that the existing index is current.
+    
+    Returns:
+    	int: `0` when generation succeeds or the index is current, `1` when
+    	the index is stale or generation fails.
+    """
     parser = argparse.ArgumentParser(description='Generate a deterministic task index.')
     parser.add_argument('--repo-root', default='.', help='Repository root.')
     parser.add_argument(

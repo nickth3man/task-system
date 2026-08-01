@@ -43,7 +43,15 @@ class TaskFailure(Exception):
 
 
 def timestamp(timezone: str) -> str:
-    """Local-offset ISO timestamp, preferring the configured IANA zone."""
+    """
+    Generate a local-offset ISO 8601 timestamp for the requested IANA timezone.
+    
+    Parameters:
+    	timezone (str): IANA timezone name to use for the timestamp.
+    
+    Returns:
+    	str: Timestamp with seconds precision and a numeric UTC offset; uses the system-local timezone when the requested timezone is unavailable.
+    """
     try:
         from zoneinfo import ZoneInfo
 
@@ -54,6 +62,15 @@ def timestamp(timezone: str) -> str:
 
 
 def existing_ids(*roots: Path) -> set[str]:
+    """
+    Collect task identifiers from valid task definition files under the specified directories.
+    
+    Parameters:
+    	*roots (Path): Directories to search recursively for task definition files.
+    
+    Returns:
+    	set[str]: The task identifiers found in valid YAML files.
+    """
     found: set[str] = set()
     for root in roots:
         if not root.is_dir():
@@ -70,6 +87,17 @@ def existing_ids(*roots: Path) -> set[str]:
 
 
 def allocate_id(config: dict, taken: set[str], year: int) -> str:
+    """
+    Allocate the next task identifier for the specified year.
+    
+    Parameters:
+    	config (dict): Repository configuration containing optional identifier settings.
+    	taken (set[str]): Existing task identifiers to inspect.
+    	year (int): Year included in the generated identifier.
+    
+    Returns:
+    	str: The next identifier using the configured prefix and sequence width.
+    """
     identifiers = config.get('identifiers') if isinstance(config.get('identifiers'), dict) else {}
     prefix = identifiers.get('prefix') if isinstance(identifiers.get('prefix'), str) else 'TASK'
     width = identifiers.get('sequence_width')
@@ -93,6 +121,22 @@ def substitutions(
     source_reference: str,
     original_request: str,
 ) -> dict[str, str]:
+    """
+    Build placeholder values for a task record from task metadata and repository configuration.
+    
+    Parameters:
+    	task_id (str): Identifier assigned to the task.
+    	slug (str): URL-safe task slug.
+    	title (str): Task title.
+    	now (str): Timestamp used for creation and update fields.
+    	config (dict): Repository configuration containing optional repository metadata.
+    	actor (str): Person or system creating the task.
+    	source_reference (str): Reference to the task's source.
+    	original_request (str): Original task request.
+    
+    Returns:
+    	dict[str, str]: Placeholder names mapped to their substituted string values.
+    """
     repository = config.get('repository') if isinstance(config.get('repository'), dict) else {}
     return {
         'TASK_ID': task_id,
@@ -109,12 +153,30 @@ def substitutions(
 
 
 def apply(text: str, values: dict[str, str]) -> str:
+    """Replace required placeholders in text with their corresponding values.
+    
+    Parameters:
+        text (str): Text containing required placeholders.
+        values (dict[str, str]): Mapping of placeholder names to replacement values.
+    
+    Returns:
+        str: Text with matching required placeholders replaced.
+    """
     for key, value in values.items():
         text = text.replace(f'__REQUIRED_{key}__', value)
     return text
 
 
 def lite_profile_types(config: dict) -> set[str]:
+    """
+    Return the configured task types that use the lite profile.
+    
+    Parameters:
+    	config (dict): Repository configuration containing lifecycle settings.
+    
+    Returns:
+    	set[str]: Configured task type names, or an empty set when the setting is unavailable or invalid.
+    """
     lifecycle = config.get('lifecycle') if isinstance(config.get('lifecycle'), dict) else {}
     allowed = lifecycle.get('lite_profile_task_types')
     if not isinstance(allowed, list):
@@ -123,7 +185,14 @@ def lite_profile_types(config: dict) -> set[str]:
 
 
 def prune_to_lite(task_dir: Path) -> list[str]:
-    """Drop artifacts the lite profile does not require."""
+    """Remove files and the evidence directory that are excluded from the lite profile.
+    
+    Parameters:
+    	task_dir (Path): Directory containing the task record.
+    
+    Returns:
+    	list[str]: Names of removed files, with the evidence directory represented with a trailing slash.
+    """
     removed: list[str] = []
     for path in sorted(task_dir.iterdir()):
         if path.is_dir() and path.name == 'evidence':
@@ -136,6 +205,15 @@ def prune_to_lite(task_dir: Path) -> list[str]:
 
 
 def remaining_placeholders(task_dir: Path) -> dict[str, list[str]]:
+    """
+    Find unresolved required placeholders in Markdown and YAML files within a task directory.
+    
+    Parameters:
+        task_dir (Path): Directory containing the task files to scan.
+    
+    Returns:
+        dict[str, list[str]]: Mapping of filenames to their unresolved placeholder names.
+    """
     found: dict[str, list[str]] = {}
     for path in sorted(task_dir.rglob('*')):
         if not path.is_file() or path.suffix not in {'.md', '.yaml'}:
@@ -147,6 +225,12 @@ def remaining_placeholders(task_dir: Path) -> dict[str, list[str]]:
 
 
 def main() -> int:
+    """
+    Create a task record from the configured template and update the task index.
+    
+    Returns:
+    	int: `0` when the task is created or the dry run succeeds; `1` when task creation fails.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repo-root', default='.', help='Repository root.')
     parser.add_argument(

@@ -190,6 +190,15 @@ def validate_schema(
     label: str,
     errors: list[str],
 ) -> None:
+    """
+    Validate data against a JSON Schema and record each validation error.
+    
+    Parameters:
+    	data (dict[str, Any]): Data to validate.
+    	schema (dict[str, Any]): JSON Schema to apply.
+    	label (str): Label identifying the validated data in error messages.
+    	errors (list[str]): List to receive formatted validation errors.
+    """
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
     for error in sorted(validator.iter_errors(data), key=lambda item: list(item.path)):
         location = '.'.join(str(part) for part in error.path) or '<root>'
@@ -206,6 +215,15 @@ def placeholder_locations(text: str) -> list[str]:
 
 
 def summarize(items: list[str]) -> str:
+    """
+    Summarize a list of items, limiting the displayed entries to the configured maximum.
+    
+    Parameters:
+    	items (list[str]): Items to summarize.
+    
+    Returns:
+    	str: A comma-separated summary, including the count of omitted items when applicable.
+    """
     shown = ', '.join(items[:MAX_REPORTED_PLACEHOLDERS])
     remaining = len(items) - MAX_REPORTED_PLACEHOLDERS
     return f'{shown} (and {remaining} more)' if remaining > 0 else shown
@@ -227,6 +245,7 @@ def placeholder_keys(value: Any, prefix: str = '') -> list[str]:
 
 
 def contains_placeholder(value: Any) -> bool:
+    """Determine whether a value or any nested item contains a placeholder."""
     if isinstance(value, str):
         return PLACEHOLDER in value
     if isinstance(value, dict):
@@ -242,6 +261,16 @@ def digest(path: Path) -> str:
 
 
 def relative(repo_root: Path, path: Path) -> str:
+    """
+    Return a POSIX-format path relative to the repository root when possible.
+    
+    Parameters:
+    	repo_root (Path): Repository root used as the reference path.
+    	path (Path): Path to convert.
+    
+    Returns:
+    	str: Repository-relative path, or the resolved absolute path when the path is outside the repository root.
+    """
     resolved_path = path.resolve(strict=False)
     resolved_root = repo_root.resolve(strict=False)
     try:
@@ -289,6 +318,16 @@ def require_paths(
 
 
 def references_id(text: str, identifier: str) -> bool:
+    """
+    Determine whether text contains an identifier as a standalone token.
+    
+    Parameters:
+    	text (str): Text to search.
+    	identifier (str): Identifier to find.
+    
+    Returns:
+    	bool: `true` if the identifier appears as a standalone token, `false` otherwise.
+    """
     pattern = rf'(?<![A-Za-z0-9_-]){re.escape(identifier)}(?![A-Za-z0-9_-])'
     return re.search(pattern, text) is not None
 
@@ -300,7 +339,16 @@ def validate_path_layout(
     bundle_root: Path,
     errors: list[str],
 ) -> None:
-    """Enforce the separation between the replaceable bundle and live state."""
+    """
+    Validate bundle and live-state path separation.
+    
+    Parameters:
+        repo_root (Path): Repository root used to resolve configured paths.
+        config_path (Path): Path to the configuration file being validated.
+        paths (dict[str, Any]): Configured template and live-state paths.
+        bundle_root (Path): Root directory of the replaceable bundle.
+        errors (list[str]): Collection to which validation errors are appended.
+    """
     label = relative(repo_root, config_path)
     task_template = configured_path(
         repo_root,
@@ -331,6 +379,15 @@ def validate_template(
     config_schema: dict[str, Any],
     errors: list[str],
 ) -> None:
+    """
+    Validate the bundle template structure, configuration, and required placeholders.
+    
+    Parameters:
+        repo_root (Path): Repository root used to report paths and resolve configured locations.
+        template_root (Path): Root directory of the bundle template.
+        config_schema (dict[str, Any]): Schema used to validate the template instance configuration.
+        errors (list[str]): List to which validation errors are appended.
+    """
     pruned = (template_root / BUNDLE_PRUNED_MARKER).is_file()
     required_files = tuple(
         name for name in TEMPLATE_REQUIRED_FILES
@@ -410,10 +467,14 @@ def validate_template(
 
 
 def requires_ci(config: dict[str, Any]) -> bool:
-    """Whether pull-request checks gate this repository's merges.
-
-    Repositories without a GitHub remote, or with `github.enabled: false`, still
-    run the full lifecycle but bind merge approval to the candidate head alone.
+    """
+    Determine whether GitHub pull-request checks are required for merge validation.
+    
+    Parameters:
+        config (dict[str, Any]): Repository and GitHub configuration.
+    
+    Returns:
+        bool: `true` when the repository provider is GitHub and GitHub checks are enabled; `false` otherwise.
     """
     repository = config.get('repository')
     github = config.get('github')
@@ -430,6 +491,17 @@ def validate_approval(
     errors: list[str],
     ci_required: bool = True,
 ) -> None:
+    """
+    Validate an approved task gate against its task metadata and artifacts.
+    
+    Parameters:
+    	name (str): Approval gate name, such as `findings`, `plan`, `pull_request`, or `merge`.
+    	approval (dict[str, Any]): Approval data to validate.
+    	task_dir (Path): Directory containing the task artifacts.
+    	task (dict[str, Any]): Task metadata and revision information.
+    	errors (list[str]): Collection to which validation errors are appended.
+    	ci_required (bool): Whether merge approval must include matching pull-request and passed CI checks.
+    """
     if approval.get('status') != 'approved':
         return
 
@@ -541,6 +613,17 @@ def allowed_transition(
 
 
 def validate_history(task_id: str, task: dict[str, Any], errors: list[str]) -> set[str]:
+    """
+    Validate a task's lifecycle history and collect its recorded states.
+    
+    Parameters:
+        task_id (str): Identifier used to label validation errors.
+        task (dict[str, Any]): Task data containing lifecycle history and status.
+        errors (list[str]): Collection to which validation errors are appended.
+    
+    Returns:
+        set[str]: States recorded as history destinations.
+    """
     history = task.get('state_history')
     if not isinstance(history, list) or not history:
         errors.append(f'{task_id}: state_history must contain at least one entry')
@@ -597,6 +680,16 @@ def validate_history(task_id: str, task: dict[str, Any], errors: list[str]) -> s
 
 
 def uses_lite_profile(task: dict[str, Any], config: dict[str, Any]) -> bool:
+    """
+    Determine whether a task uses the configured lite artifact profile.
+    
+    Parameters:
+    	task (dict[str, Any]): Task data containing its type.
+    	config (dict[str, Any]): Configuration containing lifecycle settings.
+    
+    Returns:
+    	bool: `true` if the task type is listed in `lite_profile_task_types`, `false` otherwise.
+    """
     lifecycle = config.get('lifecycle')
     allowed = lifecycle.get('lite_profile_task_types') if isinstance(lifecycle, dict) else None
     if not isinstance(allowed, list):
@@ -613,6 +706,15 @@ def validate_artifacts(
     config: dict[str, Any],
     errors: list[str],
 ) -> None:
+    """
+    Validate a task's required artifacts and their references.
+    
+    Parameters:
+    	task_dir (Path): Directory containing the task artifacts.
+    	task_id (str): Identifier used in validation errors.
+    	task (dict[str, Any]): Task metadata, including acceptance criteria and plan steps.
+    	archived (bool): Whether the task is archived.
+    """
     lite = uses_lite_profile(task, config)
     if archived:
         archive_config = config.get('archive')
@@ -717,6 +819,16 @@ def validate_merge_readiness(
     errors: list[str],
     ci_required: bool = True,
 ) -> None:
+    """
+    Validate acceptance criteria, plan steps, CI checks, and merge metadata required for a task's merge-ready status.
+    
+    Parameters:
+    	task_id (str): Identifier used to report validation errors.
+    	task (dict[str, Any]): Task data to validate.
+    	errors (list[str]): Collection to which validation errors are appended.
+    	ci_required (bool): Whether passed CI checks and a merged pull request are required.
+    
+    """
     status = task.get('status')
     if status not in MERGE_READY_STATES:
         return
@@ -849,6 +961,20 @@ def validate_task(
     config: dict[str, Any],
     errors: list[str],
 ) -> str | None:
+    """
+    Validate a task definition, its artifacts, lifecycle, approvals, and merge readiness.
+    
+    Parameters:
+    	repo_root (Path): Root directory used to report task-relative paths.
+    	task_file (Path): Path to the task definition file.
+    	archived (bool): Whether the task is located in the archive.
+    	schema (dict[str, Any]): Schema used to validate the task definition.
+    	config (dict[str, Any]): Task-system configuration used for validation rules.
+    	errors (list[str]): Collection to which validation errors are appended.
+    
+    Returns:
+    	str | None: The task identifier when it is valid enough to identify the task; otherwise, `None`.
+    """
     task = load_yaml(task_file)
     label = relative(repo_root, task_file)
     validate_schema(task, schema, label, errors)
@@ -930,9 +1056,16 @@ def validate_instructions(
     installed_version: str | None,
     errors: list[str],
 ) -> None:
-    """The root instruction file is the only discovery path, so it must be current.
-
-    A stale pointer is worse than a missing one: an agent follows it confidently.
+    """
+    Validate the root instruction file and its references to the installed task system.
+    
+    Parameters:
+        repo_root (Path): Repository root used to display relative paths.
+        instructions_path (Path): Path to the root instruction file.
+        bundle_root (Path): Installed task bundle root.
+        instance_root (Path): Live task instance root.
+        installed_version (str | None): Installed task-system version, when available.
+        errors (list[str]): Collection to which validation errors are appended.
     """
     label = relative(repo_root, instructions_path)
     if not instructions_path.is_file():
@@ -988,6 +1121,16 @@ def validate_instance(
     task_schema: dict[str, Any],
     errors: list[str],
 ) -> None:
+    """
+    Validate a live task-system instance and report configuration, layout, task, and index errors.
+    
+    Parameters:
+    	repo_root (Path): Repository root used to resolve and report paths.
+    	instance_root (Path): Root directory of the live instance.
+    	config_schema (dict[str, Any]): Schema used to validate the instance configuration.
+    	task_schema (dict[str, Any]): Schema used to validate task files.
+    	errors (list[str]): Collection to which validation errors are appended.
+    """
     config_path = instance_root / 'config.yaml'
     if not config_path.is_file():
         errors.append(f'live instance missing {relative(repo_root, config_path)}')
@@ -1111,7 +1254,14 @@ def validate_instance(
 
 
 def scan_conflicts(repo_root: Path, roots: Iterable[Path], errors: list[str]) -> None:
-    """Scan only the task-system roots, never the whole host repository."""
+    """
+    Scan the selected task-system roots for files containing unresolved merge-conflict markers.
+    
+    Parameters:
+        repo_root (Path): Repository root used to report file locations.
+        roots (Iterable[Path]): Task-system directories to scan.
+        errors (list[str]): Collection to which conflict findings are appended.
+    """
     excluded = {'.git', '.venv', '__pycache__'}
     seen: set[Path] = set()
     for root in roots:
@@ -1140,6 +1290,21 @@ def select_modes(
     template_only: bool,
     instance_only: bool,
 ) -> tuple[bool, bool]:
+    """
+    Selects which task-system roots to validate based on the requested mode.
+    
+    Parameters:
+    	template_root (Path): Path to the task-system bundle.
+    	instance_root (Path): Path to the live task instance.
+    	template_only (bool): Whether to validate only the bundle.
+    	instance_only (bool): Whether to validate only the live instance.
+    
+    Returns:
+    	tuple[bool, bool]: A pair indicating whether to validate the bundle and live instance, respectively.
+    
+    Raises:
+    	ValidationFailure: If both roots resolve to the same directory while validating both.
+    """
     if template_only:
         return True, False
     if instance_only:
@@ -1154,6 +1319,12 @@ def select_modes(
 
 
 def main() -> int:
+    """
+    Run the task-system validator for the selected bundle and live instance modes.
+    
+    Returns:
+    	int: `1` if validation errors occur, `0` otherwise.
+    """
     parser = argparse.ArgumentParser(
         description='Validate a task-system bundle and/or live task instance.'
     )

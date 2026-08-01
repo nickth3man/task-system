@@ -46,6 +46,16 @@ class InitFailure(Exception):
 
 
 def git(repo_root: Path, *args: str) -> str | None:
+    """
+    Run a Git command in a repository and return its trimmed output.
+    
+    Parameters:
+        repo_root (Path): Repository directory in which to run the command.
+        *args (str): Arguments passed to Git.
+    
+    Returns:
+        str | None: The command's trimmed standard output, or `None` if Git cannot run, fails, or produces no output.
+    """
     try:
         result = subprocess.run(
             ['git', *args],
@@ -63,6 +73,14 @@ def git(repo_root: Path, *args: str) -> str | None:
 
 
 def detect_repository_name(repo_root: Path) -> str:
+    """Determine the repository name from its origin URL or directory name.
+    
+    Parameters:
+    	repo_root (Path): The repository root directory.
+    
+    Returns:
+    	str: The repository name, without a trailing `.git` suffix.
+    """
     url = git(repo_root, 'remote', 'get-url', 'origin')
     if url:
         name = url.rstrip('/').rsplit('/', 1)[-1]
@@ -74,6 +92,11 @@ def detect_repository_name(repo_root: Path) -> str:
 
 
 def detect_default_branch(repo_root: Path) -> str:
+    """Determine the repository's default branch.
+    
+    Returns:
+    	str: The branch referenced by `origin/HEAD`, the current branch, or `main` when neither is available.
+    """
     head = git(repo_root, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD')
     if head:
         return head.rsplit('/', 1)[-1]
@@ -81,15 +104,43 @@ def detect_default_branch(repo_root: Path) -> str:
 
 
 def detect_provider(repo_root: Path) -> str:
+    """Determine the repository hosting provider from its origin URL.
+    
+    Parameters:
+        repo_root (Path): Path to the repository.
+    
+    Returns:
+        str: ``"github"`` when the origin URL contains ``github.com``; ``"other"`` otherwise.
+    """
     url = git(repo_root, 'remote', 'get-url', 'origin') or ''
     return 'github' if 'github.com' in url else 'other'
 
 
 def detect_interpreter() -> str:
+    """Select the platform-appropriate Python interpreter command.
+    
+    Returns:
+    	str: `python` on Windows or `python3` on other platforms.
+    """
     return 'python' if sys.platform == 'win32' else 'python3'
 
 
 def replace_once(text: str, old: str, new: str, label: str) -> str:
+    """
+    Replace exactly one occurrence of a required string.
+    
+    Parameters:
+        text (str): Text containing the expected occurrence.
+        old (str): String to replace.
+        new (str): Replacement string.
+        label (str): Description used in the error message.
+    
+    Returns:
+        str: Text with the single occurrence replaced.
+    
+    Raises:
+        InitFailure: If the target string occurs zero or multiple times.
+    """
     count = text.count(old)
     if count != 1:
         raise InitFailure(
@@ -112,7 +163,25 @@ def render_config(
     interpreter: str,
     instructions: str = 'AGENTS.md',
 ) -> str:
-    """Fill the template config textually so comments and ordering survive."""
+    """
+    Render a live task-system configuration from a template.
+    
+    Parameters:
+        template_text (str): Template configuration text.
+        bundle (str): Path to the distributable bundle.
+        instance (str): Path to the live task-system instance.
+        repository_name (str): Repository name to include in the configuration.
+        default_branch (str): Repository's default branch.
+        timezone (str): Configuration timezone.
+        remote (str): Git remote name.
+        provider (str): Repository hosting provider.
+        github_enabled (bool): Whether GitHub integration is enabled.
+        interpreter (str): Interpreter command used by the task system.
+        instructions (str): Agent-instructions file name.
+    
+    Returns:
+        str: Rendered live configuration text.
+    """
     text = template_text
     text = replace_once(text, 'mode: "template"', 'mode: "live"', 'config')
     text = replace_once(
@@ -144,6 +213,17 @@ def render_config(
 
 
 def substitute_paths(text: str, bundle: str, instance: str, interpreter: str) -> str:
+    """Replace default task-system paths and interpreter references with configured values.
+    
+    Parameters:
+        text (str): Template text to update.
+        bundle (str): Configured bundle path.
+        instance (str): Configured instance path.
+        interpreter (str): Configured Python interpreter command.
+    
+    Returns:
+        str: Text containing the configured paths and interpreter references.
+    """
     if instance != DEFAULT_INSTANCE_ROOT:
         text = text.replace(DEFAULT_INSTANCE_ROOT, instance)
     if bundle != DEFAULT_BUNDLE_ROOT:
@@ -173,10 +253,18 @@ def install_instructions(
     dry_run: bool,
     actions: list[str],
 ) -> None:
-    """Write, extend, or refuse to touch the repository's instruction file.
-
-    Overwriting hand-written agent instructions loses work that cannot be
-    recovered from the bundle, so an existing file is only ever appended to.
+    """
+    Create or update the repository's instruction file while preserving existing content.
+    
+    Parameters:
+        path (Path): Path to the instruction file.
+        template_text (str): Instruction template to render and write.
+        bundle (str): Bundle path substituted into the template.
+        instance (str): Live instance path substituted into the template.
+        interpreter (str): Interpreter command substituted into the template.
+        force (bool): Whether to replace an existing nonempty file.
+        dry_run (bool): Whether to record actions without writing files.
+        actions (list[str]): List to which planned or performed actions are appended.
     """
     rendered = substitute_paths(template_text, bundle, instance, interpreter)
     existing = path.read_text(encoding='utf-8') if path.is_file() else None
@@ -205,6 +293,15 @@ def install_instructions(
 
 
 def write_file(path: Path, text: str, dry_run: bool, actions: list[str]) -> None:
+    """
+    Record a file write action and optionally write UTF-8 text to the specified path.
+    
+    Parameters:
+    	path (Path): Destination file path.
+    	text (str): Content to write.
+    	dry_run (bool): Whether to record the action without modifying the filesystem.
+    	actions (list[str]): Collection to which the planned write action is appended.
+    """
     actions.append(f'write {path}')
     if dry_run:
         return
@@ -213,6 +310,12 @@ def write_file(path: Path, text: str, dry_run: bool, actions: list[str]) -> None
 
 
 def main() -> int:
+    """
+    Initialize a live task-system instance from the distributable bundle.
+    
+    Returns:
+    	int: 0 on success, or 1 when initialization fails.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repo-root', default='.', help='Repository root.')
     parser.add_argument(

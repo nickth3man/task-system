@@ -48,6 +48,18 @@ class UpgradeFailure(Exception):
 
 
 def version_tuple(value: str) -> tuple[int, ...]:
+    """
+    Parse a dotted version string into integer components.
+    
+    Parameters:
+        value (str): The version string to parse.
+    
+    Returns:
+        tuple[int, ...]: The version components as integers.
+    
+    Raises:
+        UpgradeFailure: If the version contains a component that is not an integer.
+    """
     try:
         return tuple(int(part) for part in value.strip().split('.'))
     except ValueError as exc:
@@ -55,6 +67,16 @@ def version_tuple(value: str) -> tuple[int, ...]:
 
 
 def posix(repo_root: Path, path: Path) -> str:
+    """
+    Convert a path to POSIX notation, relative to the repository when possible.
+    
+    Parameters:
+    	repo_root (Path): Repository root used as the base for relative paths.
+    	path (Path): Path to convert.
+    
+    Returns:
+    	str: The path in POSIX notation, relative to `repo_root` when it is within the repository; otherwise, its absolute POSIX path.
+    """
     resolved = path.resolve(strict=False)
     try:
         return resolved.relative_to(repo_root.resolve(strict=False)).as_posix()
@@ -81,7 +103,20 @@ def missing_keys(
     live: Any,
     trail: tuple[str, ...] = (),
 ) -> list[tuple[tuple[str, ...], Any]]:
-    """Keys present in the template config but absent from the live one."""
+    """
+    Find configuration keys that are missing from the live configuration.
+    
+    Missing keys are returned with their nested paths and template values, using
+    upgrade-specific defaults when configured.
+    
+    Parameters:
+        template (Any): Template configuration to compare.
+        live (Any): Existing live configuration.
+        trail (tuple[str, ...]): Prefix for nested key paths.
+    
+    Returns:
+        list[tuple[tuple[str, ...], Any]]: Missing key paths paired with values to assign.
+    """
     if not isinstance(template, dict) or not isinstance(live, dict):
         return []
     found: list[tuple[tuple[str, ...], Any]] = []
@@ -95,6 +130,14 @@ def missing_keys(
 
 
 def assign(config: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
+    """
+    Assign a value at a nested path in a configuration mapping.
+    
+    Parameters:
+    	config (dict[str, Any]): The configuration mapping to update.
+    	path (tuple[str, ...]): The sequence of keys identifying the target entry.
+    	value (Any): The value to assign.
+    """
     target = config
     for key in path[:-1]:
         node = target.get(key)
@@ -111,7 +154,18 @@ def rewrite_paths(
     bundle_root: Path,
     instance_root: Path,
 ) -> list[str]:
-    """Move any live-state path that points inside the bundle out to the instance."""
+    """
+    Redirect live-state paths from the bundle directory to the instance directory.
+    
+    Parameters:
+    	config (dict[str, Any]): Configuration containing live-state paths.
+    	repo_root (Path): Repository root used to normalize paths.
+    	bundle_root (Path): Bundle directory containing legacy live state.
+    	instance_root (Path): Directory receiving the live state.
+    
+    Returns:
+    	list[str]: Descriptions of each path that was updated.
+    """
     paths = config.get('paths')
     if not isinstance(paths, dict):
         return []
@@ -136,6 +190,18 @@ def rewrite_commands(
     bundle_root: Path,
     instance_root: Path,
 ) -> list[str]:
+    """
+    Update command definitions that reference bundle paths to use the instance root.
+    
+    Parameters:
+    	config (dict[str, Any]): Configuration containing command definitions.
+    	repo_root (Path): Repository root used to normalize paths.
+    	bundle_root (Path): Bundle directory containing legacy paths.
+    	instance_root (Path): Instance directory that should replace bundle references.
+    
+    Returns:
+    	list[str]: Configuration paths of the command definitions that were changed.
+    """
     commands = config.get('commands')
     if not isinstance(commands, dict):
         return []
@@ -156,6 +222,15 @@ def rewrite_commands(
 
 
 def detect_instruction_file(repo_root: Path) -> str:
+    """
+    Selects the instruction file used by the repository.
+    
+    Parameters:
+    	repo_root (Path): Root directory of the repository.
+    
+    Returns:
+    	str: The first existing candidate instruction filename, or the default candidate when none exists.
+    """
     for candidate in INSTRUCTION_CANDIDATES:
         if (repo_root / candidate).is_file():
             return candidate
@@ -169,7 +244,19 @@ def repair_instructions(
     instance_root: Path,
     installed_version: str,
 ) -> tuple[str, list[str]]:
-    """Fix exactly the references the validator reports as stale."""
+    """
+    Repair stale bundle paths and task-system version references in instruction text.
+    
+    Parameters:
+        text (str): Instruction text to update.
+        repo_root (Path): Repository root used to represent paths consistently.
+        bundle_root (Path): Existing bundle directory referenced by stale entries.
+        instance_root (Path): Instance directory that should replace bundle references.
+        installed_version (str): Task-system version to write into recognized version statements.
+    
+    Returns:
+        tuple[str, list[str]]: The repaired instruction text and descriptions of the changes made.
+    """
     import re
 
     bundle = posix(repo_root, bundle_root)
@@ -185,6 +272,15 @@ def repair_instructions(
     pattern = re.compile(r'(task[ -]system version[^0-9]{0,12})(\d+\.\d+\.\d+)', re.IGNORECASE)
 
     def replace(match: re.Match[str]) -> str:
+        """
+        Replace a recognized task-system version with the installed version.
+        
+        Parameters:
+        	match (re.Match[str]): A match containing the version statement and its stated version.
+        
+        Returns:
+        	str: The original text when the version is current; otherwise, the version statement with the installed version.
+        """
         if match.group(2) == installed_version:
             return match.group(0)
         changed.append(f'stated version {match.group(2)} -> {installed_version}')
@@ -195,6 +291,16 @@ def repair_instructions(
 
 
 def main() -> int:
+    """
+    Upgrade the task-system installation to the bundle version.
+    
+    The upgrade migrates legacy live state, updates configuration and instruction
+    references, regenerates the index, and preserves the previous configuration as
+    a backup. With ``--dry-run``, reports planned changes without modifying files.
+    
+    Returns:
+        int: ``0`` when the upgrade succeeds or is already current, otherwise ``1``.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repo-root', default='.', help='Repository root.')
     parser.add_argument('--bundle-root', default=DEFAULT_BUNDLE_ROOT, help='Bundle root.')

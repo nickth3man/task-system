@@ -66,6 +66,16 @@ class GenerateIndexTests(unittest.TestCase):
 
 class BundleLayoutTests(unittest.TestCase):
     def _make_bundle(self, repo_root: Path, paths: dict[str, str] | None = None) -> Path:
+        """
+        Create a synthetic task bundle with the required template files and directories.
+        
+        Parameters:
+        	repo_root (Path): Repository root in which to create the bundle.
+        	paths (dict[str, str] | None): Optional path configuration for the generated template.
+        
+        Returns:
+        	Path: The created bundle root.
+        """
         bundle_root = repo_root / '.tasks'
         for relative_path in validate.TEMPLATE_REQUIRED_FILES:
             path = bundle_root / relative_path
@@ -100,6 +110,16 @@ class BundleLayoutTests(unittest.TestCase):
         return bundle_root
 
     def _validate(self, repo_root: Path, bundle_root: Path) -> list[str]:
+        """
+        Validate a task bundle and collect any validation errors.
+        
+        Parameters:
+        	repo_root (Path): Root directory of the repository.
+        	bundle_root (Path): Root directory of the task bundle.
+        
+        Returns:
+        	list[str]: Validation error messages.
+        """
         errors: list[str] = []
         validate.validate_template(repo_root, bundle_root, {'type': 'object'}, errors)
         return errors
@@ -179,6 +199,16 @@ class BundleLayoutTests(unittest.TestCase):
 
 class ConflictScanTests(unittest.TestCase):
     def _scan(self, root: Path, roots: list[Path] | None = None) -> list[str]:
+        """
+        Scan the selected repository paths for unresolved merge conflicts.
+        
+        Parameters:
+        	root (Path): Repository root to scan.
+        	roots (list[Path] | None): Paths to scan within the repository; defaults to the root.
+        
+        Returns:
+        	list[str]: Conflict descriptions found during the scan.
+        """
         errors: list[str] = []
         validate.scan_conflicts(root, roots if roots is not None else [root], errors)
         return errors
@@ -224,6 +254,13 @@ class ConflictScanTests(unittest.TestCase):
 
 class CiGatingTests(unittest.TestCase):
     def _merge_ready_task(self) -> dict:
+        """
+        Create a completed task record ready for merge-related validation.
+        
+        Returns:
+        	dict: A task record with passed acceptance criteria, completed plan steps,
+        		a non-created pull request, and merge metadata.
+        """
         return {
             'status': 'completed',
             'acceptance_criteria': [
@@ -330,6 +367,15 @@ class CiGatingTests(unittest.TestCase):
 
 class InitTests(unittest.TestCase):
     def _render(self, **overrides) -> str:
+        """
+        Render the initialization configuration template with test-specific defaults.
+        
+        Parameters:
+        	overrides: Configuration values that replace the default test values.
+        
+        Returns:
+        	str: The rendered configuration text.
+        """
         arguments = {
             'bundle': '.tasks',
             'instance': '.project-tasks',
@@ -378,6 +424,14 @@ class InitTests(unittest.TestCase):
 
 class InstructionFileTests(unittest.TestCase):
     def _check(self, contents: str | None, version: str = '4.0.0') -> list[str]:
+        """Validate instruction-file contents against a temporary task-system layout.
+        
+        Parameters:
+        	contents (str | None): Instruction-file text to validate, or None to omit the file.
+        	version (str): Expected task-system version.
+        
+        Returns:
+        	list[str]: Validation error messages."""
         with tempfile.TemporaryDirectory() as directory:
             repo_root = Path(directory)
             bundle_root = repo_root / '.tasks'
@@ -479,6 +533,16 @@ class LiteProfileTests(unittest.TestCase):
         self.assertFalse(validate.uses_lite_profile({'type': 'documentation'}, {}))
 
     def _artifact_errors(self, task_type: str, files: tuple[str, ...]) -> list[str]:
+        """
+        Validate a synthetic task directory and return its artifact validation errors.
+        
+        Parameters:
+            task_type (str): The configured type of task to validate.
+            files (tuple[str, ...]): Artifact file names to create in the task directory.
+        
+        Returns:
+            list[str]: Validation error messages.
+        """
         with tempfile.TemporaryDirectory() as directory:
             repo_root = Path(directory)
             task_dir = repo_root / 'active' / 'TASK-2026-001-demo'
@@ -587,6 +651,15 @@ class InstallInstructionsTests(unittest.TestCase):
     )
 
     def _install(self, existing: str | None, force: bool = False) -> tuple[str, list[str]]:
+        """Install task-system instructions into a temporary AGENTS.md file.
+        
+        Parameters:
+        	existing (str | None): Initial file contents, or None if the file should start absent.
+        	force (bool): Whether to replace existing instructions.
+        
+        Returns:
+        	tuple[str, list[str]]: The resulting file contents and recorded installation actions.
+        """
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'AGENTS.md'
             if existing is not None:
