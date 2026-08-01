@@ -1,5 +1,5 @@
 # GENERATED VIEW ONLY. The authoritative state is each task.yaml.
-schema_version: "3.0.0"
-task_system_version: "3.0.0"
+schema_version: 3.0.0
+task_system_version: 3.0.0
 active: []
 archived: []
