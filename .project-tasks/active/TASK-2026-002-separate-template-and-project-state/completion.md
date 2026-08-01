@@ -8,8 +8,9 @@ Implementation and both requested review-remediation cycles are complete. Implem
 
 - Implementation PR: [#2](https://github.com/nickth3man/task-system/pull/2)
 - Reviewed production candidate: `ff5bbdeb076ba1f98d46afaa494c641f56f384a0`
+- Current task-record metadata head: `24e325d5472079ee65f5054fc2b1fb485805b95d`
 - Merge commit: Pending
-- Required checks: `Validate task system` passed in run `30674658942`
+- Required checks: `Validate task system` passed in run `30674820256`
 
 ## Acceptance criteria
 
@@ -18,7 +19,7 @@ Implementation and both requested review-remediation cycles are complete. Implem
 | AC-01 | Passed | `.tasks/` is a pristine, complete bundle with explicit template/live initialization, bundled regression tests, and an exact empty generated index. |
 | AC-02 | Passed | `.project-tasks/` governs this repository and contains the live task record. |
 | AC-03 | Passed | Bundled tools enforce template, instance, path, symlink, lifecycle, approval, artifact, version, index, and traceability contracts. |
-| AC-04 | Passed | Required workflow run `30674658942` passed on candidate `ff5bbdeb076ba1f98d46afaa494c641f56f384a0`; eight regression tests run before semantic validation. |
+| AC-04 | Passed | Required workflow run `30674820256` passed on current PR head `24e325d5472079ee65f5054fc2b1fb485805b95d`; eight regression tests run before semantic validation. |
 | AC-05 | Passed | Root and bundled documentation provide the complete adoption, testing, and validation workflow. |
 
 ## Durable implementation summary
