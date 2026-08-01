@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/nickth3man/task-system/main/.tasks/schemas/task.schema.json",
+  "$id": "urn:task-system:task.schema.json",
   "title": "Task System Record",
   "type": "object",
   "additionalProperties": false,

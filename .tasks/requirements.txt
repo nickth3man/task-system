@@ -1,2 +1,4 @@
-jsonschema==4.25.1
-PyYAML==6.0.2
+# Ranges, not exact pins: this file is installed into host projects that pin
+# their own versions of these libraries.
+jsonschema>=4.18,<5
+PyYAML>=6.0,<7

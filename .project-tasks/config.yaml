@@ -1,5 +1,5 @@
-schema_version: "3.0.0"
-task_system_version: "3.0.0"
+schema_version: "4.0.0"
+task_system_version: "4.0.0"
 mode: "live"
 timezone: "America/New_York"
 
@@ -10,6 +10,8 @@ repository:
   provider: "github"
 
 paths:
+  bundle: ".tasks"
+  instructions: "AGENTS.md"
   active: ".project-tasks/active"
   archive: ".project-tasks/archive"
   template: ".tasks/templates/task"
@@ -25,6 +27,7 @@ identifiers:
 
 lifecycle:
   full_profile_required: true
+  lite_profile_task_types: ["documentation", "dependency"]
   allow_not_applicable_with_reason: true
   one_agent_owns_lifecycle: true
   required_approvals: ["findings", "plan", "pull_request", "merge"]
@@ -45,10 +48,11 @@ commands:
   format: null
   lint: null
   typecheck: null
-  unit_test: "python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks"
+  unit_test: "python -m unittest discover -s .tasks/tests -p \"test_*.py\""
   integration_test: null
   end_to_end_test: null
   build: null
+  validate_bundle: "python .tasks/scripts/validate.py --template-only --template-root .tasks"
   validate_task_system: "python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks"
   generate_index: "python .tasks/scripts/generate_index.py --instance-root .project-tasks"
 
@@ -124,6 +128,4 @@ archive:
     - "temporary_screenshots"
     - "duplicate_notes"
 
-overrides:
-  live_instance_root: ".project-tasks"
-  distributable_template_root: ".tasks"
+overrides: {}

@@ -33,4 +33,6 @@ End-to-end:  __REQUIRED_E2E_COMMAND_OR_NOT_APPLICABLE__
 
 ## Task system
 
-All independently mergeable work follows `.tasks/AGENTS.md` and uses the live configuration in `.tasks/config.yaml`. `task.yaml` is authoritative. If repository rules and task-system rules conflict, stop and ask rather than choosing silently.
+All independently mergeable work follows `.tasks/AGENTS.md` and uses the live configuration in `.project-tasks/config.yaml`. `task.yaml` is authoritative. If repository rules and task-system rules conflict, stop and ask rather than choosing silently.
+
+`.tasks/` is the task-system bundle and is replaced wholesale on upgrade. Never store task records or repository-specific configuration inside it.

@@ -1,5 +1,5 @@
-schema_version: "3.0.0"
-task_system_version: "3.0.0"
+schema_version: "4.0.0"
+task_system_version: "4.0.0"
 mode: "template"
 timezone: "__REQUIRED_TIMEZONE__"
 
@@ -9,11 +9,15 @@ repository:
   remote: "origin"
   provider: "github"
 
+# `bundle` is the replaceable product directory. Every other path is live state
+# and must stay outside it so the bundle can be upgraded by replacement.
 paths:
-  active: ".tasks/active"
-  archive: ".tasks/archive"
+  bundle: ".tasks"
+  instructions: "AGENTS.md"
+  active: ".project-tasks/active"
+  archive: ".project-tasks/archive"
   template: ".tasks/templates/task"
-  index: ".tasks/index.yaml"
+  index: ".project-tasks/index.yaml"
 
 identifiers:
   prefix: "TASK"
@@ -23,8 +27,14 @@ identifiers:
   collision_policy: "retry_next_sequence"
   format: "{prefix}-{year}-{sequence}"
 
+# Task types listed in `lite_profile_task_types` require a reduced artifact set:
+# task.yaml, task.md, findings.md, plan.md, verification.md, completion.md.
+# Assessment and research are folded into findings.md. Every approval, gate, and
+# traceability rule still applies. Leave the list empty to require the full
+# profile for every task type.
 lifecycle:
   full_profile_required: true
+  lite_profile_task_types: ["documentation", "dependency"]
   allow_not_applicable_with_reason: true
   one_agent_owns_lifecycle: true
   required_approvals: ["findings", "plan", "pull_request", "merge"]
@@ -49,9 +59,9 @@ commands:
   integration_test: null
   end_to_end_test: null
   build: null
-  validate_template: "python .tasks/scripts/validate.py --template-only --template-root .tasks"
-  validate_task_system: "python .tasks/scripts/validate.py --instance-only --instance-root .tasks"
-  generate_index: "python .tasks/scripts/generate_index.py --instance-root .tasks"
+  validate_bundle: "python3 .tasks/scripts/validate.py --template-only --template-root .tasks"
+  validate_task_system: "python3 .tasks/scripts/validate.py --instance-only --instance-root .project-tasks"
+  generate_index: "python3 .tasks/scripts/generate_index.py --instance-root .project-tasks"
 
 concurrency:
   multiple_active_tasks_allowed: true
@@ -91,6 +101,9 @@ git:
   commit_subject_pattern: "{id}: {summary}"
   push_before_pr_approval: true
 
+# Set `enabled: false`, or repository.provider to "other", when the repository
+# has no GitHub pull-request checks. Merge approval then binds to the reviewed
+# candidate head alone instead of to a green check run.
 github:
   enabled: true
   ci_poll_interval_seconds: 30
@@ -106,7 +119,7 @@ github:
   archival_pr_requires_additional_user_approval: false
 
 archive:
-  path_pattern: ".tasks/archive/{year}/{month}/{id}-{slug}"
+  path_pattern: ".project-tasks/archive/{year}/{month}/{id}-{slug}"
   preserve:
     - "task.yaml"
     - "task.md"

@@ -10,24 +10,26 @@
 ## Repository architecture
 
 ```text
-.tasks/                          — distributable product; copy this directory into other projects
-.tasks/AGENTS.md                 — generic lifecycle rules installed with the product
-.tasks/config.yaml               — generic, uninitialized consumer configuration
-.tasks/scripts/                  — bundled validator and index generator
+.tasks/                          — the bundle; copy this directory into other projects
+.tasks/AGENTS.md                 — generic lifecycle rules installed with the bundle
+.tasks/scripts/                  — installer, validator, and index generator
 .tasks/schemas/                  — bundled JSON Schemas
-.tasks/templates/                — task, root AGENTS.md, and GitHub workflow templates
-.project-tasks/                  — live task instance for developing this repository
+.tasks/templates/                — task, instance config, root AGENTS.md, and workflow templates
+.tasks/tests/                    — regression tests for the bundled tools
+.project-tasks/                  — live task instance for this repository
 .project-tasks/config.yaml       — repository-specific live configuration
-.project-tasks/active/           — active source-repository task records
-.project-tasks/archive/          — archived source-repository task records
-README.md                        — product and source-repository documentation
+.project-tasks/active/           — active task records
+.project-tasks/archive/          — archived task records
+README.md                        — product and development documentation
 ```
 
-## Non-negotiable product/live boundary
+This repository is an ordinary installation of its own product. The layout above
+is the layout every adopting repository gets; nothing here is special-cased.
 
-- `.tasks/` is the copy-and-pasteable task-system product.
-- Never create live task records under `.tasks/active/` or `.tasks/archive/` in this repository.
-- Never initialize `.tasks/config.yaml` with `task-system` repository values.
+## Non-negotiable bundle/instance boundary
+
+- `.tasks/` is the copy-and-pasteable bundle and is replaced wholesale on upgrade.
+- Never place live configuration, an index, or task records inside `.tasks/`.
 - All changes to this repository, including changes inside `.tasks/`, are governed by the live instance in `.project-tasks/`.
 - Create new tasks from `.tasks/templates/task/` but store them under the active path configured by `.project-tasks/config.yaml`.
 
@@ -43,7 +45,13 @@ python .tasks/scripts/generate_index.py --instance-root .project-tasks
 Check live index:
 python .tasks/scripts/generate_index.py --instance-root .project-tasks --check
 
-Validate template and live instance:
+Create a task:
+python .tasks/scripts/new_task.py --slug <slug> --title "<title>"
+
+Run bundled regression tests:
+python -m unittest discover -s .tasks/tests -p "test_*.py"
+
+Validate bundle and live instance:
 python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks
 ```
 
@@ -51,6 +59,7 @@ python .tasks/scripts/validate.py --template-root .tasks --instance-root .projec
 
 - Follow `.tasks/AGENTS.md`, using `.project-tasks/config.yaml` as the live configuration.
 - Keep generic product behavior in `.tasks/`; keep repository-specific state in `.project-tasks/` and this root file.
+- The bundle must never reference this repository by name, owner, or URL.
 - Update template documentation, schemas, scripts, examples, and validation together when behavior changes.
 - Treat required lifecycle, schema, layout, or installation changes as major task-system versions.
 - Keep `.project-tasks/index.yaml` generated and deterministic.

@@ -11,6 +11,10 @@ import yaml
 
 INDEX_HEADER = '# GENERATED VIEW ONLY. The authoritative state is each task.yaml.\n'
 
+# The bundle is the replaceable product directory; the instance holds live state.
+DEFAULT_BUNDLE_ROOT = '.tasks'
+DEFAULT_INSTANCE_ROOT = '.project-tasks'
+
 
 def load_yaml(path: Path) -> dict[str, Any]:
     try:
@@ -120,7 +124,11 @@ def render(data: dict[str, Any]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description='Generate a deterministic task index.')
     parser.add_argument('--repo-root', default='.', help='Repository root.')
-    parser.add_argument('--instance-root', default='.tasks', help='Task instance root.')
+    parser.add_argument(
+        '--instance-root',
+        default=DEFAULT_INSTANCE_ROOT,
+        help='Live task instance root.',
+    )
     parser.add_argument(
         '--check',
         action='store_true',
@@ -145,7 +153,8 @@ def main() -> int:
             return 0
 
         index_path.parent.mkdir(parents=True, exist_ok=True)
-        index_path.write_text(expected, encoding='utf-8')
+        # newline='\n' keeps the generated index byte-identical across platforms.
+        index_path.write_text(expected, encoding='utf-8', newline='\n')
         print(f'Wrote {safe_relative(repo_root, index_path)}')
         return 0
     except (OSError, ValueError) as exc:

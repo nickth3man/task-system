@@ -12,7 +12,13 @@ from typing import Any, Iterable
 from jsonschema import Draft202012Validator, FormatChecker
 import yaml
 
-from generate_index import build_index, render, repo_path
+from generate_index import (
+    DEFAULT_BUNDLE_ROOT,
+    DEFAULT_INSTANCE_ROOT,
+    build_index,
+    render,
+    repo_path,
+)
 
 
 TASK_MARKDOWN_ARTIFACTS = (
@@ -29,29 +35,60 @@ TASK_MARKDOWN_ARTIFACTS = (
 )
 ACTIVE_REQUIRED_FILES = ('task.yaml', *TASK_MARKDOWN_ARTIFACTS)
 ACTIVE_REQUIRED_DIRECTORIES = ('evidence/screenshots',)
+# The lite profile folds assessment and research into findings.md and drops the
+# active-only working files. completion.md stays so archived records remain
+# self-describing. Every approval and traceability rule is unchanged.
+LITE_REQUIRED_FILES = (
+    'task.yaml',
+    'task.md',
+    'findings.md',
+    'plan.md',
+    'verification.md',
+    'completion.md',
+)
+LITE_REQUIRED_DIRECTORIES: tuple[str, ...] = ()
 TEMPLATE_REQUIRED_FILES = (
+    '.gitignore',
     'AGENTS.md',
     'README.md',
     'VERSION',
-    'config.yaml',
-    'index.yaml',
     'requirements.txt',
     'schemas/config.schema.json',
     'schemas/task.schema.json',
     'scripts/validate.py',
     'scripts/generate_index.py',
+    'scripts/init.py',
+    'scripts/new_task.py',
+    'scripts/upgrade.py',
     'tests/test_tools.py',
     'templates/AGENTS.md',
+    'templates/instance/config.yaml',
     'templates/github/workflows/validate-task-system.yml',
     'templates/task/task.yaml',
     *(f'templates/task/{name}' for name in TASK_MARKDOWN_ARTIFACTS),
 )
 TEMPLATE_REQUIRED_DIRECTORIES = (
-    'active',
-    'archive',
     'templates/task/evidence/screenshots',
     'tests',
 )
+# The bundle is the replaceable product. Live task state must never live inside
+# it, or upgrading the bundle would destroy the repository's task records.
+TEMPLATE_FORBIDDEN_DIRECTORIES = ('active', 'archive')
+TEMPLATE_FORBIDDEN_FILES = ('config.yaml', 'index.yaml')
+LIVE_STATE_PATH_KEYS = ('active', 'archive', 'index')
+
+# `init.py --prune-install-files` drops everything only needed at install time
+# and leaves this marker behind, so a pruned bundle still validates.
+BUNDLE_PRUNED_MARKER = '.pruned'
+INSTALL_ONLY_FILES = (
+    'README.md',
+    'scripts/init.py',
+    'tests/test_tools.py',
+    'templates/AGENTS.md',
+    'templates/instance/config.yaml',
+    'templates/github/workflows/validate-task-system.yml',
+)
+INSTALL_ONLY_DIRECTORIES = ('tests',)
 
 NORMAL_STATES = (
     'draft',
@@ -104,9 +141,21 @@ MERGE_READY_STATES = {
 }
 MERGED_STATES = {'completed', 'archived'}
 
-CONFLICT_RE = re.compile(r'(?m)^(?:<<<<<<< .+|=======|>>>>>>> .+)$')
+# A bare `=======` line is also a Markdown setext heading and an ordinary ASCII
+# divider, so it is never sufficient on its own. Only a paired start and end
+# marker identifies an unresolved conflict.
+CONFLICT_START_RE = re.compile(r'(?m)^<<<<<<< \S')
+CONFLICT_END_RE = re.compile(r'(?m)^>>>>>>> \S')
 PLACEHOLDER = '__REQUIRED_'
+PLACEHOLDER_RE = re.compile(r'__REQUIRED_[A-Z0-9_]*__')
+MAX_REPORTED_PLACEHOLDERS = 5
 HEX64 = re.compile(r'^[0-9a-f]{64}$')
+# A root instruction file that still points at these is describing a pre-4.0
+# layout, where live state lived inside the bundle.
+REMOVED_BUNDLE_PATHS = ('config.yaml', 'index.yaml', 'active', 'archive')
+STATED_VERSION_RE = re.compile(
+    r'task[ -]system version[^0-9]{0,12}(\d+)\.(\d+)\.(\d+)', re.IGNORECASE
+)
 
 
 class ValidationFailure(Exception):
@@ -147,6 +196,36 @@ def validate_schema(
         errors.append(f'{label}: schema error at {location}: {error.message}')
 
 
+def placeholder_locations(text: str) -> list[str]:
+    """Return `line:TOKEN` strings for every placeholder left in `text`."""
+    found: list[str] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        for match in PLACEHOLDER_RE.finditer(line):
+            found.append(f'{number}:{match.group(0)}')
+    return found
+
+
+def summarize(items: list[str]) -> str:
+    shown = ', '.join(items[:MAX_REPORTED_PLACEHOLDERS])
+    remaining = len(items) - MAX_REPORTED_PLACEHOLDERS
+    return f'{shown} (and {remaining} more)' if remaining > 0 else shown
+
+
+def placeholder_keys(value: Any, prefix: str = '') -> list[str]:
+    """Return dotted key paths whose value still holds a placeholder."""
+    found: list[str] = []
+    if isinstance(value, str):
+        if PLACEHOLDER in value:
+            found.append(prefix or '<root>')
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            found.extend(placeholder_keys(item, f'{prefix}.{key}' if prefix else str(key)))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            found.extend(placeholder_keys(item, f'{prefix}[{index}]'))
+    return found
+
+
 def contains_placeholder(value: Any) -> bool:
     if isinstance(value, str):
         return PLACEHOLDER in value
@@ -158,7 +237,8 @@ def contains_placeholder(value: Any) -> bool:
 
 
 def digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Hash normalized content so an approval survives a CRLF checkout."""
+    return hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
 
 
 def relative(repo_root: Path, path: Path) -> str:
@@ -213,23 +293,78 @@ def references_id(text: str, identifier: str) -> bool:
     return re.search(pattern, text) is not None
 
 
+def validate_path_layout(
+    repo_root: Path,
+    config_path: Path,
+    paths: dict[str, Any],
+    bundle_root: Path,
+    errors: list[str],
+) -> None:
+    """Enforce the separation between the replaceable bundle and live state."""
+    label = relative(repo_root, config_path)
+    task_template = configured_path(
+        repo_root,
+        paths.get('template'),
+        f'{label}: paths.template',
+        errors,
+    )
+    expected_template = (bundle_root / 'templates/task').resolve(strict=False)
+    if task_template is not None and task_template != expected_template:
+        errors.append(
+            f'{label}: paths.template must resolve to '
+            f'{relative(repo_root, expected_template)}'
+        )
+
+    for key in LIVE_STATE_PATH_KEYS:
+        target = configured_path(repo_root, paths.get(key), f'{label}: paths.{key}', errors)
+        if target is not None and is_within(target, bundle_root):
+            errors.append(
+                f'{label}: paths.{key} must stay outside the bundle at '
+                f'{relative(repo_root, bundle_root)} so the bundle can be replaced '
+                'on upgrade'
+            )
+
+
 def validate_template(
     repo_root: Path,
     template_root: Path,
     config_schema: dict[str, Any],
     errors: list[str],
 ) -> None:
+    pruned = (template_root / BUNDLE_PRUNED_MARKER).is_file()
+    required_files = tuple(
+        name for name in TEMPLATE_REQUIRED_FILES
+        if not (pruned and name in INSTALL_ONLY_FILES)
+    )
+    required_directories = tuple(
+        name for name in TEMPLATE_REQUIRED_DIRECTORIES
+        if not (pruned and name in INSTALL_ONLY_DIRECTORIES)
+    )
     require_paths(
         template_root,
-        TEMPLATE_REQUIRED_FILES,
-        TEMPLATE_REQUIRED_DIRECTORIES,
+        required_files,
+        required_directories,
         repo_root,
         errors,
-        'template',
+        'bundle',
     )
 
-    config_path = template_root / 'config.yaml'
-    config: dict[str, Any] | None = None
+    for name in TEMPLATE_FORBIDDEN_DIRECTORIES:
+        path = template_root / name
+        if path.is_dir():
+            errors.append(
+                f'bundle must not contain live task state: '
+                f'{relative(repo_root, path)}'
+            )
+    for name in TEMPLATE_FORBIDDEN_FILES:
+        path = template_root / name
+        if path.is_file():
+            errors.append(
+                f'bundle must not contain live instance files: '
+                f'{relative(repo_root, path)}'
+            )
+
+    config_path = template_root / 'templates/instance/config.yaml'
     if config_path.is_file():
         config = load_yaml(config_path)
         validate_schema(config, config_schema, relative(repo_root, config_path), errors)
@@ -249,26 +384,14 @@ def validate_template(
         if not isinstance(paths, dict):
             errors.append(f'{relative(repo_root, config_path)}: paths must be a mapping')
         else:
-            for key in ('active', 'archive', 'template', 'index'):
-                target = configured_path(
-                    repo_root,
-                    paths.get(key),
-                    f'{relative(repo_root, config_path)}: paths.{key}',
-                    errors,
-                )
-                if target is not None and not is_within(target, template_root):
-                    errors.append(
-                        f'{relative(repo_root, config_path)}: paths.{key} must stay inside '
-                        f'{relative(repo_root, template_root)}'
-                    )
-
-    for area in ('active', 'archive'):
-        area_root = template_root / area
-        task_files = list(area_root.rglob('task.yaml')) if area_root.exists() else []
-        if task_files:
-            errors.append(
-                f'{relative(repo_root, area_root)} must contain no live task records'
+            bundle_root = configured_path(
+                repo_root,
+                paths.get('bundle'),
+                f'{relative(repo_root, config_path)}: paths.bundle',
+                errors,
             )
+            if bundle_root is not None:
+                validate_path_layout(repo_root, config_path, paths, bundle_root, errors)
 
     task_template_root = template_root / 'templates/task'
     task_yaml = task_template_root / 'task.yaml'
@@ -285,21 +408,18 @@ def validate_template(
                 f'{relative(repo_root, artifact)} must retain required placeholders'
             )
 
-    if config is not None:
-        try:
-            index_path, data = build_index(repo_root, template_root)
-            expected = render(data)
-            actual = index_path.read_text(encoding='utf-8') if index_path.is_file() else ''
-            if actual != expected:
-                errors.append(
-                    f'{relative(repo_root, index_path)} must be the generated empty '
-                    'template index'
-                )
-        except (OSError, ValueError) as exc:
-            errors.append(
-                f'{relative(repo_root, template_root)}: unable to verify template index: '
-                f'{exc}'
-            )
+
+def requires_ci(config: dict[str, Any]) -> bool:
+    """Whether pull-request checks gate this repository's merges.
+
+    Repositories without a GitHub remote, or with `github.enabled: false`, still
+    run the full lifecycle but bind merge approval to the candidate head alone.
+    """
+    repository = config.get('repository')
+    github = config.get('github')
+    provider = repository.get('provider') if isinstance(repository, dict) else None
+    enabled = github.get('enabled') if isinstance(github, dict) else None
+    return provider == 'github' and enabled is not False
 
 
 def validate_approval(
@@ -308,6 +428,7 @@ def validate_approval(
     task_dir: Path,
     task: dict[str, Any],
     errors: list[str],
+    ci_required: bool = True,
 ) -> None:
     if approval.get('status') != 'approved':
         return
@@ -374,7 +495,7 @@ def validate_approval(
         return
 
     expected_head = candidate_head
-    if name == 'merge':
+    if name == 'merge' and ci_required:
         pr_head = pull_request.get('head_sha')
         if not isinstance(pr_head, str) or not pr_head:
             errors.append(f'{task_id}: merge approval requires pull_request.head_sha')
@@ -383,7 +504,6 @@ def validate_approval(
                 f'{task_id}: merge approval requires pull_request.head_sha to equal '
                 f'git.candidate_head_sha ({candidate_head})'
             )
-        expected_head = candidate_head
 
     if approval.get('head_sha') != expected_head:
         errors.append(
@@ -391,7 +511,7 @@ def validate_approval(
             f'candidate head {expected_head}'
         )
 
-    if name == 'merge':
+    if name == 'merge' and ci_required:
         checks = pull_request.get('checks')
         if not isinstance(checks, dict) or checks.get('status') != 'passed':
             errors.append(
@@ -476,6 +596,14 @@ def validate_history(task_id: str, task: dict[str, Any], errors: list[str]) -> s
     return reached
 
 
+def uses_lite_profile(task: dict[str, Any], config: dict[str, Any]) -> bool:
+    lifecycle = config.get('lifecycle')
+    allowed = lifecycle.get('lite_profile_task_types') if isinstance(lifecycle, dict) else None
+    if not isinstance(allowed, list):
+        return False
+    return task.get('type') in {item for item in allowed if isinstance(item, str)}
+
+
 def validate_artifacts(
     repo_root: Path,
     task_dir: Path,
@@ -485,6 +613,7 @@ def validate_artifacts(
     config: dict[str, Any],
     errors: list[str],
 ) -> None:
+    lite = uses_lite_profile(task, config)
     if archived:
         archive_config = config.get('archive')
         preserve = archive_config.get('preserve') if isinstance(archive_config, dict) else None
@@ -493,9 +622,16 @@ def validate_artifacts(
             if isinstance(preserve, list)
             else ('task.yaml', 'task.md', 'completion.md')
         )
+        if lite:
+            required_files = tuple(
+                name for name in required_files if name in LITE_REQUIRED_FILES
+            )
         if 'task.yaml' not in required_files:
             required_files = ('task.yaml', *required_files)
         required_directories: tuple[str, ...] = ()
+    elif lite:
+        required_files = LITE_REQUIRED_FILES
+        required_directories = LITE_REQUIRED_DIRECTORIES
     else:
         required_files = ACTIVE_REQUIRED_FILES
         required_directories = ACTIVE_REQUIRED_DIRECTORIES
@@ -511,9 +647,13 @@ def validate_artifacts(
 
     for name in TASK_MARKDOWN_ARTIFACTS:
         artifact = task_dir / name
-        if artifact.is_file() and PLACEHOLDER in artifact.read_text(encoding='utf-8'):
+        if not artifact.is_file():
+            continue
+        found = placeholder_locations(artifact.read_text(encoding='utf-8'))
+        if found:
             errors.append(
-                f'{task_id}: live artifact {name} contains an unreplaced placeholder'
+                f'{task_id}: {name} has {len(found)} unreplaced placeholder(s) at '
+                f'{summarize(found)}'
             )
 
     paths = {
@@ -575,6 +715,7 @@ def validate_merge_readiness(
     task_id: str,
     task: dict[str, Any],
     errors: list[str],
+    ci_required: bool = True,
 ) -> None:
     status = task.get('status')
     if status not in MERGE_READY_STATES:
@@ -612,12 +753,13 @@ def validate_merge_readiness(
     pull_request = (
         task.get('pull_request') if isinstance(task.get('pull_request'), dict) else {}
     )
-    checks = pull_request.get('checks')
-    if not isinstance(checks, dict) or checks.get('status') != 'passed':
-        errors.append(f'{task_id}: {status} requires passed pull-request checks')
+    if ci_required:
+        checks = pull_request.get('checks')
+        if not isinstance(checks, dict) or checks.get('status') != 'passed':
+            errors.append(f'{task_id}: {status} requires passed pull-request checks')
 
     if status in MERGED_STATES:
-        if pull_request.get('state') != 'merged':
+        if ci_required and pull_request.get('state') != 'merged':
             errors.append(f'{task_id}: {status} requires a merged pull request')
         merge = task.get('merge') if isinstance(task.get('merge'), dict) else {}
         for field in ('commit_sha', 'merged_at', 'merged_by'):
@@ -721,8 +863,11 @@ def validate_task(
         errors.append(f'{label}: directory must be named {expected_dir}')
 
     validate_artifacts(repo_root, task_dir, task_id, task, archived, config, errors)
-    if contains_placeholder(task):
-        errors.append(f'{task_id}: live task contains an unreplaced placeholder')
+    stale_keys = placeholder_keys(task)
+    if stale_keys:
+        errors.append(
+            f'{task_id}: task.yaml has unreplaced placeholders at {summarize(stale_keys)}'
+        )
 
     status = task.get('status')
     if archived and status != 'archived':
@@ -760,6 +905,7 @@ def validate_task(
                         f'{task_id}: {plan_id} references missing criterion {criterion}'
                     )
 
+    ci_required = requires_ci(config)
     approvals = task.get('approvals')
     if not isinstance(approvals, dict):
         approvals = {}
@@ -768,17 +914,75 @@ def validate_task(
         approval = approvals.get(name)
         if not isinstance(approval, dict):
             approval = {}
-        validate_approval(name, approval, task_dir, task, errors)
+        validate_approval(name, approval, task_dir, task, errors, ci_required)
         require_approval(task_id, approvals, name, reached, errors)
 
-    validate_merge_readiness(task_id, task, errors)
+    validate_merge_readiness(task_id, task, errors, ci_required)
     validate_blocker(task_id, task, reached, errors)
     return task_id
 
 
+def validate_instructions(
+    repo_root: Path,
+    instructions_path: Path,
+    bundle_root: Path,
+    instance_root: Path,
+    installed_version: str | None,
+    errors: list[str],
+) -> None:
+    """The root instruction file is the only discovery path, so it must be current.
+
+    A stale pointer is worse than a missing one: an agent follows it confidently.
+    """
+    label = relative(repo_root, instructions_path)
+    if not instructions_path.is_file():
+        errors.append(
+            f'missing agent instruction file {label}; nothing directs an agent to '
+            'the task system'
+        )
+        return
+
+    text = instructions_path.read_text(encoding='utf-8')
+    bundle = relative(repo_root, bundle_root)
+    instance = relative(repo_root, instance_root)
+
+    if not text.strip():
+        errors.append(
+            f'{label} is empty; run scripts/init.py --install-root-agents to write '
+            'the task-system section'
+        )
+        return
+
+    if f'{bundle}/AGENTS.md' not in text:
+        errors.append(f'{label} does not reference {bundle}/AGENTS.md')
+    if instance not in text:
+        errors.append(
+            f'{label} does not reference the live instance {instance}; it may describe '
+            'a previous installation'
+        )
+
+    for name in REMOVED_BUNDLE_PATHS:
+        stale = f'{bundle}/{name}'
+        if stale in text:
+            errors.append(
+                f'{label} references {stale}, which no longer exists; live state '
+                f'moved to {instance}'
+            )
+
+    match = STATED_VERSION_RE.search(text)
+    if match and installed_version:
+        stated_major = match.group(1)
+        installed_major = installed_version.split('.')[0]
+        if stated_major != installed_major:
+            stated = '.'.join(match.group(1, 2, 3))
+            errors.append(
+                f'{label} states task-system version {stated}, but version '
+                f'{installed_version} is installed'
+            )
+
+
 def validate_instance(
     repo_root: Path,
-    template_root: Path,
     instance_root: Path,
     config_schema: dict[str, Any],
     task_schema: dict[str, Any],
@@ -804,7 +1008,7 @@ def validate_instance(
         return
 
     resolved: dict[str, Path] = {}
-    for key in ('active', 'archive', 'index'):
+    for key in LIVE_STATE_PATH_KEYS:
         target = configured_path(
             repo_root,
             paths.get(key),
@@ -820,20 +1024,44 @@ def validate_instance(
                 f'{relative(repo_root, instance_root)}'
             )
 
-    task_template = configured_path(
+    bundle_root = configured_path(
         repo_root,
-        paths.get('template'),
-        f'{relative(repo_root, config_path)}: paths.template',
+        paths.get('bundle'),
+        f'{relative(repo_root, config_path)}: paths.bundle',
         errors,
     )
-    expected_template = (template_root / 'templates/task').resolve(strict=False)
-    if task_template is not None and task_template != expected_template:
+    if bundle_root is None:
+        return
+    if not bundle_root.is_dir():
         errors.append(
-            f'{relative(repo_root, config_path)}: paths.template must resolve to '
-            f'{relative(repo_root, expected_template)}'
+            f'{relative(repo_root, config_path)}: paths.bundle does not exist: '
+            f'{relative(repo_root, bundle_root)}'
+        )
+    validate_path_layout(repo_root, config_path, paths, bundle_root, errors)
+
+    instructions_path = configured_path(
+        repo_root,
+        paths.get('instructions'),
+        f'{relative(repo_root, config_path)}: paths.instructions',
+        errors,
+    )
+    if instructions_path is not None:
+        version_file = bundle_root / 'VERSION'
+        installed_version = (
+            version_file.read_text(encoding='utf-8').strip()
+            if version_file.is_file()
+            else None
+        )
+        validate_instructions(
+            repo_root,
+            instructions_path,
+            bundle_root,
+            instance_root,
+            installed_version,
+            errors,
         )
 
-    if not {'active', 'archive', 'index'}.issubset(resolved):
+    if not set(LIVE_STATE_PATH_KEYS).issubset(resolved):
         return
 
     active_root = resolved['active']
@@ -882,19 +1110,28 @@ def validate_instance(
         )
 
 
-def scan_conflicts(repo_root: Path, errors: list[str]) -> None:
+def scan_conflicts(repo_root: Path, roots: Iterable[Path], errors: list[str]) -> None:
+    """Scan only the task-system roots, never the whole host repository."""
     excluded = {'.git', '.venv', '__pycache__'}
-    for path in repo_root.rglob('*'):
-        if not path.is_file() or any(part in excluded for part in path.parts):
+    seen: set[Path] = set()
+    for root in roots:
+        if not root.is_dir():
             continue
-        try:
-            text = path.read_text(encoding='utf-8')
-        except UnicodeDecodeError:
-            continue
-        if CONFLICT_RE.search(text):
-            errors.append(
-                f'{relative(repo_root, path)} contains an unresolved merge-conflict marker'
-            )
+        for path in sorted(root.rglob('*')):
+            resolved = path.resolve(strict=False)
+            if not path.is_file() or resolved in seen:
+                continue
+            if any(part in excluded for part in path.parts):
+                continue
+            seen.add(resolved)
+            try:
+                text = path.read_text(encoding='utf-8')
+            except (UnicodeDecodeError, OSError):
+                continue
+            if CONFLICT_START_RE.search(text) and CONFLICT_END_RE.search(text):
+                errors.append(
+                    f'{relative(repo_root, path)} contains an unresolved merge-conflict marker'
+                )
 
 
 def select_modes(
@@ -907,33 +1144,37 @@ def select_modes(
         return True, False
     if instance_only:
         return False, True
-    if template_root.resolve(strict=False) != instance_root.resolve(strict=False):
-        return True, True
-
-    config = load_yaml(instance_root / 'config.yaml')
-    mode = config.get('mode')
-    if mode == 'template':
-        return True, False
-    if mode == 'live':
-        return False, True
-    raise ValidationFailure(
-        f'{instance_root / "config.yaml"}: same-root validation requires mode '
-        'template or live, or an explicit --template-only/--instance-only flag'
-    )
+    if template_root.resolve(strict=False) == instance_root.resolve(strict=False):
+        raise ValidationFailure(
+            f'{template_root}: the bundle and the live instance must be separate '
+            'directories; run scripts/init.py to create a live instance outside '
+            'the bundle'
+        )
+    return True, True
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description='Validate a task-system template and/or live task instance.'
+        description='Validate a task-system bundle and/or live task instance.'
     )
     parser.add_argument('--repo-root', default='.', help='Repository root.')
-    parser.add_argument('--template-root', default='.tasks', help='Bundle/template root.')
-    parser.add_argument('--instance-root', default='.tasks', help='Live instance root.')
+    parser.add_argument(
+        '--template-root',
+        '--bundle-root',
+        dest='template_root',
+        default=DEFAULT_BUNDLE_ROOT,
+        help='Bundle root (the distributable product directory).',
+    )
+    parser.add_argument(
+        '--instance-root',
+        default=DEFAULT_INSTANCE_ROOT,
+        help='Live instance root (config, index, active and archive records).',
+    )
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument(
         '--template-only',
         action='store_true',
-        help='Validate only the pristine distributable template.',
+        help='Validate only the pristine distributable bundle.',
     )
     mode_group.add_argument(
         '--instance-only',
@@ -958,18 +1199,20 @@ def main() -> int:
         )
         config_schema = load_json(template_root / 'schemas/config.schema.json')
         task_schema = load_json(template_root / 'schemas/task.schema.json')
+        scanned: list[Path] = []
         if validate_template_mode:
             validate_template(repo_root, template_root, config_schema, errors)
+            scanned.append(template_root)
         if validate_instance_mode:
             validate_instance(
                 repo_root,
-                template_root,
                 instance_root,
                 config_schema,
                 task_schema,
                 errors,
             )
-        scan_conflicts(repo_root, errors)
+            scanned.append(instance_root)
+        scan_conflicts(repo_root, scanned, errors)
     except (OSError, ValueError, ValidationFailure) as exc:
         errors.append(str(exc))
 
@@ -980,7 +1223,7 @@ def main() -> int:
         return 1
 
     if validate_template_mode:
-        print(f'Template valid: {relative(repo_root, template_root)}')
+        print(f'Bundle valid: {relative(repo_root, template_root)}')
     if validate_instance_mode:
         print(f'Live instance valid: {relative(repo_root, instance_root)}')
     return 0

@@ -1,0 +1,4 @@
+# Byte-code from the bundled tools. Copying an already-used bundle into another
+# repository otherwise carries these along into the first commit.
+__pycache__/
+*.py[cod]
