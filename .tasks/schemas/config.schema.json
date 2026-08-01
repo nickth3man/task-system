@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/nickth3man/task-system/main/.tasks/schemas/config.schema.json",
+  "$id": "urn:task-system:config.schema.json",
   "title": "Task System Configuration",
   "type": "object",
   "additionalProperties": false,
@@ -26,8 +26,10 @@
     },
     "paths": {
       "type": "object", "additionalProperties": false,
-      "required": ["active", "archive", "template", "index"],
+      "required": ["bundle", "instructions", "active", "archive", "template", "index"],
       "properties": {
+        "bundle": {"type": "string", "minLength": 1, "description": "Replaceable product directory. Never holds live task state."},
+        "instructions": {"type": "string", "minLength": 1, "description": "Repository-root agent instruction file that points at this task system."},
         "active": {"type": "string", "minLength": 1},
         "archive": {"type": "string", "minLength": 1},
         "template": {"type": "string", "minLength": 1},

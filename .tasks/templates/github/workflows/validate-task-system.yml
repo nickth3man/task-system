@@ -1,7 +1,13 @@
 name: Validate task system
 
+# Runs on every pull request so the check always reports a conclusion, but
+# skips push runs when no task files changed.
 on:
   push:
+    paths:
+      - ".tasks/**"
+      - ".project-tasks/**"
+      - ".github/workflows/validate-task-system.yml"
   pull_request:
 
 permissions:
@@ -17,6 +23,5 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: .tasks/requirements.txt
-      - run: python -m pip install -r .tasks/requirements.txt
-      - run: python -m unittest discover -s .tasks/tests -p "test_*.py" -v
-      - run: python .tasks/scripts/validate.py --instance-only --instance-root .tasks
+      - run: python3 -m pip install -r .tasks/requirements.txt
+      - run: python3 .tasks/scripts/validate.py --instance-only --template-root .tasks --instance-root .project-tasks

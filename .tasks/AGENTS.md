@@ -1,6 +1,6 @@
 # Task Lifecycle Instructions
 
-These rules govern the task instance selected by the repository's root `AGENTS.md` and configuration. In ordinary installations, the live instance is `.tasks/`. In the task-system source repository, the live instance is `.project-tasks/` while `.tasks/` remains the distributable product.
+These rules govern this repository's live task instance. The bundle directory holding these rules is the product and is replaced wholesale on upgrade; live task records live in a separate instance directory alongside it, `.project-tasks/` by default.
 
 ## Core rules
 
@@ -12,12 +12,29 @@ These rules govern the task instance selected by the repository's root `AGENTS.m
 6. Never silently stash, discard, overwrite, commit, or absorb unrelated work.
 7. Every implementing task uses its own branch or worktree.
 8. Review the committed production candidate, not only uncommitted files.
-9. GitHub workflow checks are the required post-PR gate; review comments are handled when the user requests it or repository policy requires it.
+9. Where the repository has pull-request checks, they are the required post-PR gate; review comments are handled when the user requests it or repository policy requires it.
 10. A task is completed when the implementation PR merges and archived when its finalized directory exists in the configured archive path on the default branch.
+
+## Operations
+
+Act on these directly when asked. Do not ask which variant to use — there is only one of each. Run the scripts from the repository root with the interpreter recorded in `commands`, and prefer the `commands.*` entries in `config.yaml` over the literal paths below when they are present.
+
+| Ask | Do |
+| --- | --- |
+| "initialize the task system", "set this up" | `python3 .tasks/scripts/init.py`. Safe to re-run: it never overwrites an existing configuration or instruction file. Add `--dry-run` first if the repository state is unclear. |
+| "create a task for X" | `python3 .tasks/scripts/new_task.py --slug <kebab-case> --title "<one line>" --type <type> --original-request "<the request verbatim>"`, then fill the placeholders it lists. |
+| "validate", "is the task system healthy?" | `commands.validate_task_system`, and `commands.validate_bundle` when the bundle itself changed. |
+| "regenerate the index" | `commands.generate_index`. Also required after every status transition. |
+| "upgrade the task system" | Replace the bundle directory with the new one, then `python3 .tasks/scripts/upgrade.py`. |
+| any lifecycle step ("assess", "plan", "implement", "open the PR", "archive") | Follow the Lifecycle section below, updating `task.yaml` and regenerating the index for every transition. |
+
+A fresh task record fails validation until its placeholders are replaced. That is expected, not a defect; finish the artifacts for the current state before reporting the system healthy.
 
 ## Paths
 
-Read the active, archive, template, and index paths from the live instance's `config.yaml`. Do not assume that live task records are under `.tasks/`.
+Read the active, archive, template, and index paths from the live instance's `config.yaml`. Never create or modify task records inside `paths.bundle`; the bundle is replaced on upgrade and anything stored there is lost.
+
+`paths.instructions` is always `AGENTS.md` at the repository root.
 
 The branch convention is:
 
@@ -25,9 +42,18 @@ The branch convention is:
 task/TASK-YYYY-NNN-kebab-case-slug
 ```
 
+## Agent instruction file
+
+`paths.instructions` names the repository-root file that directs agents here. It
+must reference the bundle's `AGENTS.md` and the live instance path, and it must
+not describe a layout the installed version no longer has. The validator checks
+this, because a stale pointer is followed confidently rather than ignored. Update
+it in the same task that changes the layout or the installed major version.
+
 ## Required artifacts
 
-Every active task contains:
+Every task type requires the same artifacts and passes the same gates. There is
+no reduced profile. An active task contains:
 
 - `task.yaml`
 - `task.md`
@@ -113,6 +139,8 @@ Commit the production candidate, then review the committed range plus staged, un
 `git.candidate_head_sha` identifies the reviewed production candidate. PR-creation approval binds to that SHA. A later commit may update only the current task record with PR or CI metadata; such a metadata-only commit does not replace the production candidate. Any commit that changes product code, tests, configuration, generated product artifacts, or user-facing documentation creates a new candidate and invalidates the prior head-bound approval.
 
 Merge approval binds to the exact candidate recorded in `pull_request.head_sha` after required checks for that candidate pass. The validator rejects stale approval revisions, stale candidate SHAs, and merge approvals without passed checks.
+
+When the repository has no pull-request checks — `repository.provider` is `other`, or `github.enabled` is `false` — merge approval binds to `git.candidate_head_sha` alone and no check status is required. Every other gate still applies.
 
 ## Pull request, CI, and merge
 
