@@ -14,6 +14,7 @@ import yaml
 
 from generate_index import build_index, render, repo_path
 
+
 TASK_MARKDOWN_ARTIFACTS = (
     'task.md',
     'assessment.md',
@@ -39,12 +40,18 @@ TEMPLATE_REQUIRED_FILES = (
     'schemas/task.schema.json',
     'scripts/validate.py',
     'scripts/generate_index.py',
+    'tests/test_tools.py',
     'templates/AGENTS.md',
     'templates/github/workflows/validate-task-system.yml',
     'templates/task/task.yaml',
     *(f'templates/task/{name}' for name in TASK_MARKDOWN_ARTIFACTS),
 )
-TEMPLATE_REQUIRED_DIRECTORIES = ('active', 'archive', 'templates/task/evidence/screenshots')
+TEMPLATE_REQUIRED_DIRECTORIES = (
+    'active',
+    'archive',
+    'templates/task/evidence/screenshots',
+    'tests',
+)
 
 NORMAL_STATES = (
     'draft',
@@ -80,6 +87,7 @@ CORRECTION_TRANSITIONS = {
     ('waiting_for_ci', 'implementing'),
     ('awaiting_merge_approval', 'implementing'),
 }
+TERMINAL_STATES = {'completed', 'archived', 'failed', 'cancelled', 'superseded'}
 
 APPROVAL_GATES = {
     'findings': set(NORMAL_STATES[NORMAL_STATES.index('planning') :]),
@@ -87,7 +95,13 @@ APPROVAL_GATES = {
     'pull_request': set(NORMAL_STATES[NORMAL_STATES.index('creating_pr') :]),
     'merge': set(NORMAL_STATES[NORMAL_STATES.index('merging') :]),
 }
-MERGE_READY_STATES = {'awaiting_merge_approval', 'merging', 'completing', 'completed', 'archived'}
+MERGE_READY_STATES = {
+    'awaiting_merge_approval',
+    'merging',
+    'completing',
+    'completed',
+    'archived',
+}
 MERGED_STATES = {'completed', 'archived'}
 
 CONFLICT_RE = re.compile(r'(?m)^(?:<<<<<<< .+|=======|>>>>>>> .+)$')
@@ -194,6 +208,11 @@ def require_paths(
             errors.append(f'{prefix} missing required directory: {relative(repo_root, path)}')
 
 
+def references_id(text: str, identifier: str) -> bool:
+    pattern = rf'(?<![A-Za-z0-9_-]){re.escape(identifier)}(?![A-Za-z0-9_-])'
+    return re.search(pattern, text) is not None
+
+
 def validate_template(
     repo_root: Path,
     template_root: Path,
@@ -210,6 +229,7 @@ def validate_template(
     )
 
     config_path = template_root / 'config.yaml'
+    config: dict[str, Any] | None = None
     if config_path.is_file():
         config = load_yaml(config_path)
         validate_schema(config, config_schema, relative(repo_root, config_path), errors)
@@ -263,6 +283,22 @@ def validate_template(
         if artifact.is_file() and PLACEHOLDER not in artifact.read_text(encoding='utf-8'):
             errors.append(
                 f'{relative(repo_root, artifact)} must retain required placeholders'
+            )
+
+    if config is not None:
+        try:
+            index_path, data = build_index(repo_root, template_root)
+            expected = render(data)
+            actual = index_path.read_text(encoding='utf-8') if index_path.is_file() else ''
+            if actual != expected:
+                errors.append(
+                    f'{relative(repo_root, index_path)} must be the generated empty '
+                    'template index'
+                )
+        except (OSError, ValueError) as exc:
+            errors.append(
+                f'{relative(repo_root, template_root)}: unable to verify template index: '
+                f'{exc}'
             )
 
 
@@ -333,13 +369,23 @@ def validate_approval(
         task.get('pull_request') if isinstance(task.get('pull_request'), dict) else {}
     )
     candidate_head = git_data.get('candidate_head_sha')
+    if not isinstance(candidate_head, str) or not candidate_head:
+        errors.append(f'{task_id}: approved {name} approval has no current candidate head')
+        return
+
     expected_head = candidate_head
     if name == 'merge':
-        expected_head = pull_request.get('head_sha') or candidate_head
+        pr_head = pull_request.get('head_sha')
+        if not isinstance(pr_head, str) or not pr_head:
+            errors.append(f'{task_id}: merge approval requires pull_request.head_sha')
+        elif pr_head != candidate_head:
+            errors.append(
+                f'{task_id}: merge approval requires pull_request.head_sha to equal '
+                f'git.candidate_head_sha ({candidate_head})'
+            )
+        expected_head = candidate_head
 
-    if not expected_head:
-        errors.append(f'{task_id}: approved {name} approval has no current candidate head')
-    elif approval.get('head_sha') != expected_head:
+    if approval.get('head_sha') != expected_head:
         errors.append(
             f'{task_id}: approved {name} approval head_sha must equal current '
             f'candidate head {expected_head}'
@@ -353,14 +399,23 @@ def validate_approval(
             )
 
 
-def allowed_transition(previous: str, following: str) -> bool:
+def allowed_transition(
+    previous: str,
+    following: str,
+    blocked_resume_status: str | None,
+) -> bool:
     if NORMAL_TRANSITIONS.get(previous) == following:
         return True
     if (previous, following) in CORRECTION_TRANSITIONS:
         return True
-    if previous == 'blocked' and following in KNOWN_STATES - {'draft'}:
-        return True
-    if previous not in {'archived', 'failed', 'cancelled', 'superseded'}:
+    if previous == 'blocked':
+        return (
+            blocked_resume_status is not None
+            and following == blocked_resume_status
+            and following in NORMAL_STATES
+            and following not in {'completed', 'archived'}
+        )
+    if previous not in TERMINAL_STATES:
         return following in EXCEPTIONAL_STATES
     return False
 
@@ -371,8 +426,16 @@ def validate_history(task_id: str, task: dict[str, Any], errors: list[str]) -> s
         errors.append(f'{task_id}: state_history must contain at least one entry')
         return set()
 
+    blocker = task.get('blocker') if isinstance(task.get('blocker'), dict) else {}
+    resume_value = blocker.get('resume_status')
+    blocked_resume_status = resume_value if isinstance(resume_value, str) else None
+
     first = history[0]
-    if not isinstance(first, dict) or first.get('from') is not None or first.get('to') != 'draft':
+    if (
+        not isinstance(first, dict)
+        or first.get('from') is not None
+        or first.get('to') != 'draft'
+    ):
         errors.append(f'{task_id}: state_history must start with null -> draft')
 
     reached: set[str] = set()
@@ -398,7 +461,7 @@ def validate_history(task_id: str, task: dict[str, Any], errors: list[str]) -> s
             if (
                 isinstance(source, str)
                 and isinstance(destination, str)
-                and not allowed_transition(source, destination)
+                and not allowed_transition(source, destination, blocked_resume_status)
             ):
                 errors.append(
                     f'{task_id}: invalid lifecycle transition {source} -> {destination}'
@@ -453,23 +516,26 @@ def validate_artifacts(
                 f'{task_id}: live artifact {name} contains an unreplaced placeholder'
             )
 
-    task_md = task_dir / 'task.md'
-    verification_md = task_dir / 'verification.md'
-    completion_md = task_dir / 'completion.md'
-    plan_md = task_dir / 'plan.md'
-    texts: dict[str, str] = {}
-    for path in (task_md, verification_md, completion_md, plan_md):
-        if path.is_file():
-            texts[path.name] = path.read_text(encoding='utf-8')
+    paths = {
+        name: task_dir / name
+        for name in ('task.md', 'verification.md', 'completion.md', 'plan.md')
+    }
+    texts = {
+        name: path.read_text(encoding='utf-8')
+        for name, path in paths.items()
+        if path.is_file()
+    }
 
     criteria = task.get('acceptance_criteria')
     if isinstance(criteria, list):
         for criterion in criteria:
-            if not isinstance(criterion, dict) or not isinstance(criterion.get('id'), str):
+            if not isinstance(criterion, dict):
                 continue
-            criterion_id = criterion['id']
+            criterion_id = criterion.get('id')
+            if not isinstance(criterion_id, str):
+                continue
             for name in ('task.md', 'verification.md', 'completion.md'):
-                if name in texts and criterion_id not in texts[name]:
+                if name in texts and not references_id(texts[name], criterion_id):
                     errors.append(
                         f'{task_id}: {name} does not reference acceptance criterion '
                         f'{criterion_id}'
@@ -478,11 +544,14 @@ def validate_artifacts(
     plan_steps = task.get('plan_steps')
     if isinstance(plan_steps, list) and 'plan.md' in texts:
         for step in plan_steps:
-            if not isinstance(step, dict) or not isinstance(step.get('id'), str):
+            if not isinstance(step, dict):
                 continue
-            if step['id'] not in texts['plan.md']:
+            plan_id = step.get('id')
+            if not isinstance(plan_id, str):
+                continue
+            if not references_id(texts['plan.md'], plan_id):
                 errors.append(
-                    f'{task_id}: plan.md does not reference plan step {step["id"]}'
+                    f'{task_id}: plan.md does not reference plan step {plan_id}'
                 )
 
 
@@ -556,6 +625,74 @@ def validate_merge_readiness(
                 errors.append(f'{task_id}: {status} requires merge.{field}')
 
 
+def string_ids(items: Any, field: str = 'id') -> list[str]:
+    if not isinstance(items, list):
+        return []
+    return [
+        value
+        for item in items
+        if isinstance(item, dict)
+        for value in [item.get(field)]
+        if isinstance(value, str)
+    ]
+
+
+def validate_blocker(
+    task_id: str,
+    task: dict[str, Any],
+    reached: set[str],
+    errors: list[str],
+) -> None:
+    blocker = task.get('blocker')
+    status = task.get('status')
+    if 'blocked' not in reached:
+        if isinstance(blocker, dict) and blocker.get('is_blocked'):
+            errors.append(f'{task_id}: blocker.is_blocked is true without a blocked state')
+        return
+
+    if not isinstance(blocker, dict):
+        errors.append(f'{task_id}: blocked history requires blocker metadata')
+        return
+
+    entered_from = blocker.get('entered_from_status')
+    resume_status = blocker.get('resume_status')
+    if not isinstance(entered_from, str) or entered_from not in NORMAL_STATES:
+        errors.append(f'{task_id}: blocker.entered_from_status must be a normal state')
+    if not isinstance(resume_status, str) or resume_status not in NORMAL_STATES:
+        errors.append(f'{task_id}: blocker.resume_status must be a normal state')
+    if entered_from in {'completed', 'archived'} or resume_status in {'completed', 'archived'}:
+        errors.append(f'{task_id}: blocker cannot enter from or resume to a terminal state')
+    if isinstance(entered_from, str) and resume_status != entered_from:
+        errors.append(
+            f'{task_id}: blocker.resume_status must equal blocker.entered_from_status'
+        )
+
+    history = task.get('state_history')
+    blocked_entries = (
+        [entry for entry in history if isinstance(entry, dict) and entry.get('to') == 'blocked']
+        if isinstance(history, list)
+        else []
+    )
+    if blocked_entries and blocked_entries[-1].get('from') != entered_from:
+        errors.append(
+            f'{task_id}: blocker.entered_from_status must match the latest transition '
+            'into blocked'
+        )
+
+    if status == 'blocked':
+        if blocker.get('is_blocked') is not True:
+            errors.append(f'{task_id}: blocked status requires blocker.is_blocked true')
+        for field in ('reason', 'since', 'required_user_decision'):
+            if not blocker.get(field):
+                errors.append(f'{task_id}: blocked task missing blocker.{field}')
+    else:
+        if blocker.get('is_blocked') is not False:
+            errors.append(f'{task_id}: resumed task requires blocker.is_blocked false')
+        for field in ('resolved_at', 'resolution'):
+            if not blocker.get(field):
+                errors.append(f'{task_id}: resumed task missing blocker.{field}')
+
+
 def validate_task(
     repo_root: Path,
     task_file: Path,
@@ -590,16 +727,12 @@ def validate_task(
     reached = validate_history(task_id, task, errors)
 
     criteria = task.get('acceptance_criteria')
-    criterion_ids: list[Any] = []
-    if isinstance(criteria, list):
-        criterion_ids = [item.get('id') for item in criteria if isinstance(item, dict)]
+    criterion_ids = string_ids(criteria)
     if len(criterion_ids) != len(set(criterion_ids)):
         errors.append(f'{task_id}: duplicate acceptance criterion IDs')
 
     plan_steps = task.get('plan_steps')
-    plan_ids: list[Any] = []
-    if isinstance(plan_steps, list):
-        plan_ids = [item.get('id') for item in plan_steps if isinstance(item, dict)]
+    plan_ids = string_ids(plan_steps)
     if len(plan_ids) != len(set(plan_ids)):
         errors.append(f'{task_id}: duplicate plan step IDs')
 
@@ -608,15 +741,17 @@ def validate_task(
         for step in plan_steps:
             if not isinstance(step, dict):
                 continue
+            plan_id = step.get('id') if isinstance(step.get('id'), str) else '<unknown>'
             supports = step.get('supports')
             if not isinstance(supports, list) or not supports:
-                errors.append(f'{task_id}: {step.get("id")} must support at least one criterion')
+                errors.append(f'{task_id}: {plan_id} must support at least one criterion')
                 continue
             for criterion in supports:
+                if not isinstance(criterion, str):
+                    continue
                 if criterion not in criterion_set:
                     errors.append(
-                        f'{task_id}: {step.get("id")} references missing criterion '
-                        f'{criterion}'
+                        f'{task_id}: {plan_id} references missing criterion {criterion}'
                     )
 
     approvals = task.get('approvals')
@@ -631,22 +766,7 @@ def validate_task(
         require_approval(task_id, approvals, name, reached, errors)
 
     validate_merge_readiness(task_id, task, errors)
-
-    blocker = task.get('blocker')
-    if status == 'blocked':
-        if not isinstance(blocker, dict):
-            errors.append(f'{task_id}: blocked task requires blocker metadata')
-        else:
-            for field in (
-                'entered_from_status',
-                'reason',
-                'since',
-                'required_user_decision',
-                'resume_status',
-            ):
-                if not blocker.get(field):
-                    errors.append(f'{task_id}: blocked task missing blocker.{field}')
-
+    validate_blocker(task_id, task, reached, errors)
     return task_id
 
 
@@ -715,28 +835,28 @@ def validate_instance(
     ids: list[str] = []
     active_files = sorted(active_root.rglob('task.yaml')) if active_root.exists() else []
     archive_files = sorted(archive_root.rglob('task.yaml')) if archive_root.exists() else []
-    for task_file in active_files:
+    for task_file, archived in [
+        *((path, False) for path in active_files),
+        *((path, True) for path in archive_files),
+    ]:
+        root = archive_root if archived else active_root
+        if not is_within(task_file, root):
+            errors.append(
+                f'{relative(repo_root, task_file)} resolves outside configured '
+                f'{"archive" if archived else "active"} root'
+            )
+            continue
         task_id = validate_task(
             repo_root,
             task_file,
-            False,
+            archived,
             task_schema,
             config,
             errors,
         )
         if task_id:
             ids.append(task_id)
-    for task_file in archive_files:
-        task_id = validate_task(
-            repo_root,
-            task_file,
-            True,
-            task_schema,
-            config,
-            errors,
-        )
-        if task_id:
-            ids.append(task_id)
+
     if len(ids) != len(set(ids)):
         errors.append(
             f'{relative(repo_root, instance_root)}: duplicate task IDs across active and archive'
