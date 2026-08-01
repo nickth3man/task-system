@@ -19,8 +19,8 @@
   - `python .tasks/scripts/validate.py --instance-only --instance-root .tasks` in a simulated initialized installation
   - `python .tasks/scripts/validate.py --template-root .tasks --instance-root .project-tasks`
   - `python -m unittest discover -s .tasks/tests -p "test_*.py" -v`
-- Actual: Template-only, instance-only, same-root, and source-repository dual-root flows passed; all eight validator/index regression tests passed.
-- Negative cases: path escape, symlink escape, missing versions, malformed YAML and list-valued IDs, Markdown placeholders, missing screenshots, prefix-sharing AC/PLAN references, invalid lifecycle transitions, blocked-state jumps, stale approval heads/revisions, and missing approval gates all failed cleanly as expected.
+- Actual: Template-only, instance-only, same-root, and source-repository dual-root flows passed; all nine validator/index regression tests passed.
+- Negative cases: path escape, symlink escape, missing versions, malformed YAML, malformed list-valued IDs, malformed blocker status fields, Markdown placeholders, missing screenshots, prefix-sharing AC/PLAN references, invalid lifecycle transitions, blocked-state jumps, stale approval heads/revisions, and missing approval gates all failed cleanly as expected.
 
 ## AC-04 — CI enforcement
 
@@ -28,7 +28,7 @@
 - Evidence:
   - GitHub Actions run `30674627587` correctly failed when exact template-index validation detected a stale generated view.
   - After regeneration, candidate workflow run `30674658942` passed on `ff5bbdeb076ba1f98d46afaa494c641f56f384a0`.
-  - Final PR workflow run `30674895729` passed after the documentation-only evidence updates.
+  - GitHub Actions run `30676496878` passed after malformed blocker metadata was type-guarded, its regression test was added, and the temporary patch workflow was removed on cleanup candidate `0aa95eea88f99c98fef59b6a38f6d44a5bfe6f02`.
   - The source and adopter workflow templates both execute the regression suite before semantic validation.
 
 ## AC-05 — Clear installation path
