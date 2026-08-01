@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib
+import json
 from pathlib import Path
 import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import yaml
 
@@ -954,6 +956,464 @@ class ValidatorTests(unittest.TestCase):
     def test_same_root_bundle_and_instance_is_rejected(self) -> None:
         with self.assertRaisesRegex(validate.ValidationFailure, 'separate'):
             validate.select_modes(Path('.tasks'), Path('.tasks'), False, False)
+
+
+class SelectModesTests(unittest.TestCase):
+    def test_template_only_flag_validates_only_the_bundle(self) -> None:
+        self.assertEqual(
+            validate.select_modes(Path('.tasks'), Path('.project-tasks'), True, False),
+            (True, False),
+        )
+
+    def test_instance_only_flag_validates_only_the_instance(self) -> None:
+        self.assertEqual(
+            validate.select_modes(Path('.tasks'), Path('.project-tasks'), False, True),
+            (False, True),
+        )
+
+    def test_distinct_roots_validate_both_by_default(self) -> None:
+        self.assertEqual(
+            validate.select_modes(Path('.tasks'), Path('.project-tasks'), False, False),
+            (True, True),
+        )
+
+
+class DigestNormalizationTests(unittest.TestCase):
+    def test_crlf_and_lf_produce_the_same_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            lf_path = Path(directory) / 'lf.md'
+            crlf_path = Path(directory) / 'crlf.md'
+            lf_path.write_bytes(b'line one\nline two\n')
+            crlf_path.write_bytes(b'line one\r\nline two\r\n')
+
+            self.assertEqual(validate.digest(lf_path), validate.digest(crlf_path))
+
+    def test_different_content_produces_different_digests(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            a = Path(directory) / 'a.md'
+            b = Path(directory) / 'b.md'
+            a.write_bytes(b'alpha\n')
+            b.write_bytes(b'beta\n')
+
+            self.assertNotEqual(validate.digest(a), validate.digest(b))
+
+
+class PackagingArtifactTests(unittest.TestCase):
+    def test_requirements_use_version_ranges_not_exact_pins(self) -> None:
+        text = (BUNDLE_ROOT / 'requirements.txt').read_text(encoding='utf-8')
+        requirement_lines = [
+            line for line in text.splitlines()
+            if line.strip() and not line.strip().startswith('#')
+        ]
+
+        self.assertTrue(requirement_lines, 'expected at least one requirement')
+        for line in requirement_lines:
+            self.assertNotIn('==', line, f'{line!r} should use a range, not an exact pin')
+            self.assertRegex(line, r'>=\d', f'{line!r} should specify a lower bound')
+
+    def test_gitignore_excludes_bytecode_artifacts(self) -> None:
+        text = (BUNDLE_ROOT / '.gitignore').read_text(encoding='utf-8')
+
+        self.assertIn('__pycache__/', text)
+        self.assertIn('*.py[cod]', text)
+
+
+class WorkflowFilesTests(unittest.TestCase):
+    def _run_steps(self, path: Path) -> list[dict]:
+        """Return the steps of the workflow's `validate` job."""
+        workflow = yaml.safe_load(path.read_text(encoding='utf-8'))
+        return workflow['jobs']['validate']['steps']
+
+    def test_root_workflow_invokes_python3(self) -> None:
+        steps = self._run_steps(BUNDLE_ROOT.parent / '.github/workflows/validate.yml')
+        run_commands = [step['run'] for step in steps if 'run' in step]
+
+        self.assertTrue(run_commands, 'expected at least one run step')
+        for command in run_commands:
+            self.assertTrue(command.startswith('python3 '), f'{command!r} should use python3')
+
+    def test_bundled_workflow_template_invokes_python3(self) -> None:
+        steps = self._run_steps(BUNDLE_ROOT / init.TEMPLATE_WORKFLOW)
+        run_commands = [step['run'] for step in steps if 'run' in step]
+
+        self.assertTrue(run_commands, 'expected at least one run step')
+        for command in run_commands:
+            self.assertTrue(command.startswith('python3 '), f'{command!r} should use python3')
+
+
+class ShippedArtifactValidationTests(unittest.TestCase):
+    """Regression coverage validating the actual bundle and instance this repository ships."""
+
+    REPO_ROOT = BUNDLE_ROOT.parent
+
+    def test_shipped_bundle_validates_against_its_own_schema(self) -> None:
+        config_schema = json.loads(
+            (BUNDLE_ROOT / 'schemas/config.schema.json').read_text(encoding='utf-8')
+        )
+        errors: list[str] = []
+
+        validate.validate_template(self.REPO_ROOT, BUNDLE_ROOT, config_schema, errors)
+
+        self.assertEqual(errors, [], errors)
+
+    def test_shipped_live_instance_validates_against_its_own_schema(self) -> None:
+        config_schema = json.loads(
+            (BUNDLE_ROOT / 'schemas/config.schema.json').read_text(encoding='utf-8')
+        )
+        task_schema = json.loads(
+            (BUNDLE_ROOT / 'schemas/task.schema.json').read_text(encoding='utf-8')
+        )
+        instance_root = self.REPO_ROOT / '.project-tasks'
+        errors: list[str] = []
+
+        validate.validate_instance(
+            self.REPO_ROOT, instance_root, config_schema, task_schema, errors
+        )
+
+        self.assertEqual(errors, [], errors)
+
+    def test_config_schema_uses_urn_identifiers_not_networked_urls(self) -> None:
+        config_schema = json.loads(
+            (BUNDLE_ROOT / 'schemas/config.schema.json').read_text(encoding='utf-8')
+        )
+        task_schema = json.loads(
+            (BUNDLE_ROOT / 'schemas/task.schema.json').read_text(encoding='utf-8')
+        )
+
+        self.assertTrue(config_schema['$id'].startswith('urn:'))
+        self.assertTrue(task_schema['$id'].startswith('urn:'))
+
+    def test_config_schema_requires_bundle_and_instructions_paths(self) -> None:
+        config_schema = json.loads(
+            (BUNDLE_ROOT / 'schemas/config.schema.json').read_text(encoding='utf-8')
+        )
+
+        required = config_schema['properties']['paths']['required']
+
+        self.assertIn('bundle', required)
+        self.assertIn('instructions', required)
+
+
+class GitDetectionFallbackTests(unittest.TestCase):
+    def test_falls_back_when_there_is_no_git_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+
+            self.assertEqual(init.detect_repository_name(repo_root), repo_root.name)
+            self.assertEqual(init.detect_default_branch(repo_root), 'main')
+            self.assertEqual(init.detect_provider(repo_root), 'other')
+
+    def test_detect_interpreter_matches_the_platform(self) -> None:
+        expected = 'python' if sys.platform == 'win32' else 'python3'
+
+        self.assertEqual(init.detect_interpreter(), expected)
+
+
+class ReplaceOnceTests(unittest.TestCase):
+    def test_replaces_a_single_occurrence(self) -> None:
+        self.assertEqual(
+            init.replace_once('mode: "template"', 'template', 'live', 'label'),
+            'mode: "live"',
+        )
+
+    def test_raises_when_the_occurrence_is_missing(self) -> None:
+        with self.assertRaisesRegex(init.InitFailure, 'found 0'):
+            init.replace_once('abc', 'zzz', 'yyy', 'label')
+
+    def test_raises_when_the_occurrence_is_ambiguous(self) -> None:
+        with self.assertRaisesRegex(init.InitFailure, 'found 2'):
+            init.replace_once('aa', 'a', 'b', 'label')
+
+
+class TaskSystemSectionTests(unittest.TestCase):
+    def test_extracts_the_task_system_section_only(self) -> None:
+        text = '# Doc\n\n## Other\n\nx\n\n## Task system\n\nBody line.\n\n## Later\n\ny\n'
+
+        section = init.task_system_section(text)
+
+        self.assertEqual(section, '## Task system\n\nBody line.\n')
+
+    def test_raises_when_the_heading_is_missing(self) -> None:
+        with self.assertRaisesRegex(init.InitFailure, 'no ## Task system section'):
+            init.task_system_section('# Doc\n\nNo such heading.\n')
+
+
+def run_main(module, argv: list[str]) -> int:
+    """Invoke a script module's `main()` with the given command-line arguments."""
+    with mock.patch.object(sys, 'argv', argv):
+        return module.main()
+
+
+class InitMainIntegrationTests(unittest.TestCase):
+    def _copy_bundle(self, repo_root: Path) -> Path:
+        bundle_root = repo_root / '.tasks'
+        shutil.copytree(BUNDLE_ROOT, bundle_root)
+        return bundle_root
+
+    def test_init_creates_a_validating_live_instance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            self._copy_bundle(repo_root)
+            instance_root = repo_root / '.project-tasks'
+
+            exit_code = run_main(
+                init,
+                [
+                    'init.py',
+                    '--repo-root', str(repo_root),
+                    '--repository-name', 'demo-repo',
+                    '--default-branch', 'main',
+                    '--timezone', 'UTC',
+                    '--provider', 'github',
+                    '--install-root-agents',
+                ],
+            )
+
+            self.assertEqual(exit_code, 0)
+            config = yaml.safe_load((instance_root / 'config.yaml').read_text(encoding='utf-8'))
+            self.assertEqual(config['mode'], 'live')
+            self.assertEqual(config['repository']['name'], 'demo-repo')
+            self.assertTrue((repo_root / 'AGENTS.md').is_file())
+            self.assertTrue((instance_root / 'index.yaml').is_file())
+
+            config_schema = json.loads(
+                (repo_root / '.tasks/schemas/config.schema.json').read_text(encoding='utf-8')
+            )
+            task_schema = json.loads(
+                (repo_root / '.tasks/schemas/task.schema.json').read_text(encoding='utf-8')
+            )
+            errors: list[str] = []
+            validate.validate_instance(repo_root, instance_root, config_schema, task_schema, errors)
+            self.assertEqual(errors, [], errors)
+
+    def test_init_refuses_to_overwrite_existing_config_without_force(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            self._copy_bundle(repo_root)
+            run_main(
+                init,
+                [
+                    'init.py', '--repo-root', str(repo_root),
+                    '--repository-name', 'demo', '--default-branch', 'main',
+                    '--provider', 'github',
+                ],
+            )
+
+            exit_code = run_main(
+                init,
+                [
+                    'init.py', '--repo-root', str(repo_root),
+                    '--repository-name', 'demo', '--default-branch', 'main',
+                    '--provider', 'github',
+                ],
+            )
+
+            self.assertEqual(exit_code, 1)
+
+    def test_dry_run_makes_no_filesystem_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            self._copy_bundle(repo_root)
+
+            exit_code = run_main(
+                init,
+                [
+                    'init.py', '--repo-root', str(repo_root),
+                    '--repository-name', 'demo', '--default-branch', 'main',
+                    '--provider', 'github', '--install-root-agents', '--dry-run',
+                ],
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertFalse((repo_root / '.project-tasks').exists())
+            self.assertFalse((repo_root / 'AGENTS.md').exists())
+
+
+class NewTaskMainIntegrationTests(unittest.TestCase):
+    def _init_instance(self, repo_root: Path) -> Path:
+        shutil.copytree(BUNDLE_ROOT, repo_root / '.tasks')
+        run_main(
+            init,
+            [
+                'init.py', '--repo-root', str(repo_root),
+                '--repository-name', 'demo', '--default-branch', 'main',
+                '--timezone', 'UTC', '--provider', 'github',
+            ],
+        )
+        return repo_root / '.project-tasks'
+
+    def test_new_task_creates_a_populated_task_directory_and_updates_the_index(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            instance_root = self._init_instance(repo_root)
+
+            exit_code = run_main(
+                new_task,
+                [
+                    'new_task.py', '--repo-root', str(repo_root),
+                    '--instance-root', str(instance_root),
+                    '--slug', 'demo-task', '--title', 'Demo task',
+                    '--original-request', 'Do the thing.',
+                ],
+            )
+
+            self.assertEqual(exit_code, 0)
+            task_dirs = list((instance_root / 'active').iterdir())
+            self.assertEqual(len(task_dirs), 1)
+            task_dir = task_dirs[0]
+            self.assertTrue(task_dir.name.startswith('TASK-'))
+            for name in validate.ACTIVE_REQUIRED_FILES:
+                self.assertTrue((task_dir / name).is_file(), name)
+            task = yaml.safe_load((task_dir / 'task.yaml').read_text(encoding='utf-8'))
+            self.assertEqual(task['slug'], 'demo-task')
+            self.assertEqual(task['title'], 'Demo task')
+            index = yaml.safe_load((instance_root / 'index.yaml').read_text(encoding='utf-8'))
+            self.assertEqual(len(index['active']), 1)
+            self.assertEqual(index['active'][0]['slug'], 'demo-task')
+
+    def test_new_task_prunes_to_lite_profile_for_configured_types(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            instance_root = self._init_instance(repo_root)
+
+            exit_code = run_main(
+                new_task,
+                [
+                    'new_task.py', '--repo-root', str(repo_root),
+                    '--instance-root', str(instance_root),
+                    '--slug', 'update-docs', '--title', 'Update docs',
+                    '--type', 'documentation',
+                ],
+            )
+
+            self.assertEqual(exit_code, 0)
+            task_dir = next((instance_root / 'active').iterdir())
+            self.assertEqual(
+                sorted(p.name for p in task_dir.iterdir()),
+                sorted(validate.LITE_REQUIRED_FILES),
+            )
+
+    def test_rejects_non_kebab_case_slug(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            instance_root = self._init_instance(repo_root)
+
+            exit_code = run_main(
+                new_task,
+                [
+                    'new_task.py', '--repo-root', str(repo_root),
+                    '--instance-root', str(instance_root),
+                    '--slug', 'Not_Kebab', '--title', 'Bad slug',
+                ],
+            )
+
+            self.assertEqual(exit_code, 1)
+            self.assertFalse(list((instance_root / 'active').iterdir()))
+
+
+class UpgradeMainIntegrationTests(unittest.TestCase):
+    def _legacy_repo(self, directory: str) -> tuple[Path, Path]:
+        """Build a pre-4.0 installation with live state still inside the bundle."""
+        repo_root = Path(directory)
+        bundle_root = repo_root / '.tasks'
+        shutil.copytree(BUNDLE_ROOT, bundle_root)
+        legacy_config = {
+            'schema_version': '3.0.0',
+            'task_system_version': '3.0.0',
+            'mode': 'live',
+            'timezone': 'UTC',
+            'repository': {
+                'name': 'demo', 'default_branch': 'main',
+                'remote': 'origin', 'provider': 'github',
+            },
+            'paths': {
+                'active': '.tasks/active', 'archive': '.tasks/archive',
+                'template': '.tasks/templates/task', 'index': '.tasks/index.yaml',
+            },
+            'identifiers': {'prefix': 'TASK', 'sequence_width': 3},
+            'lifecycle': {'full_profile_required': True},
+            'research': {},
+            'commands': {
+                'unit_test': 'python -m unittest discover -s .tasks/tests -p "test_*.py"',
+                'generate_index': 'python .tasks/scripts/generate_index.py --instance-root .tasks',
+            },
+            'concurrency': {}, 'artifacts': {}, 'acceptance_criteria': {}, 'plan': {},
+            'git': {}, 'github': {'enabled': True}, 'archive': {}, 'overrides': {},
+        }
+        (bundle_root / 'config.yaml').write_text(
+            yaml.safe_dump(legacy_config, sort_keys=False), encoding='utf-8'
+        )
+        (bundle_root / 'active').mkdir()
+        (bundle_root / 'archive').mkdir()
+        (bundle_root / 'index.yaml').write_text(
+            '# GENERATED VIEW ONLY. The authoritative state is each task.yaml.\n'
+            'schema_version: 3.0.0\ntask_system_version: 3.0.0\nactive: []\narchived: []\n',
+            encoding='utf-8',
+        )
+        return repo_root, bundle_root
+
+    def test_upgrade_moves_legacy_state_out_of_the_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root, bundle_root = self._legacy_repo(directory)
+            instance_root = repo_root / '.project-tasks'
+
+            exit_code = run_main(upgrade, ['upgrade.py', '--repo-root', str(repo_root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertFalse((bundle_root / 'config.yaml').exists())
+            self.assertFalse((bundle_root / 'active').exists())
+            self.assertFalse((bundle_root / 'archive').exists())
+            self.assertFalse((bundle_root / 'index.yaml').exists())
+            config = yaml.safe_load((instance_root / 'config.yaml').read_text(encoding='utf-8'))
+            self.assertEqual(config['task_system_version'], '4.0.0')
+            self.assertEqual(config['paths']['active'], '.project-tasks/active')
+            self.assertEqual(config['paths']['bundle'], '.tasks')
+            self.assertEqual(config['lifecycle']['lite_profile_task_types'], [])
+
+    def test_upgrade_is_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root, _ = self._legacy_repo(directory)
+            run_main(upgrade, ['upgrade.py', '--repo-root', str(repo_root)])
+
+            exit_code = run_main(upgrade, ['upgrade.py', '--repo-root', str(repo_root)])
+
+            self.assertEqual(exit_code, 0)
+
+    def test_dry_run_does_not_move_legacy_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root, bundle_root = self._legacy_repo(directory)
+
+            exit_code = run_main(
+                upgrade, ['upgrade.py', '--repo-root', str(repo_root), '--dry-run']
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((bundle_root / 'config.yaml').exists())
+            self.assertFalse((repo_root / '.project-tasks').exists())
+
+    def test_upgrade_refuses_to_downgrade_newer_records(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            shutil.copytree(BUNDLE_ROOT, repo_root / '.tasks')
+            instance_root = repo_root / '.project-tasks'
+            instance_root.mkdir()
+            config = yaml.safe_load(
+                (BUNDLE_ROOT / init.TEMPLATE_CONFIG).read_text(encoding='utf-8')
+            )
+            config['mode'] = 'live'
+            config['task_system_version'] = '5.0.0'
+            config['repository'] = {
+                'name': 'demo', 'default_branch': 'main',
+                'remote': 'origin', 'provider': 'github',
+            }
+            config['timezone'] = 'UTC'
+            (instance_root / 'config.yaml').write_text(
+                yaml.safe_dump(config, sort_keys=False), encoding='utf-8'
+            )
+
+            exit_code = run_main(upgrade, ['upgrade.py', '--repo-root', str(repo_root)])
+
+            self.assertEqual(exit_code, 1)
 
 
 if __name__ == '__main__':
