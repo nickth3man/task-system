@@ -27,7 +27,8 @@
 - Status: Passed
 - Evidence:
   - GitHub Actions run `30674627587` correctly failed when exact template-index validation detected a stale generated view.
-  - After regeneration, GitHub Actions run `30674658942` passed on production candidate `ff5bbdeb076ba1f98d46afaa494c641f56f384a0`.
+  - After regeneration, candidate workflow run `30674658942` passed on `ff5bbdeb076ba1f98d46afaa494c641f56f384a0`.
+  - Final PR workflow run `30674895729` passed after the documentation-only evidence updates.
   - The source and adopter workflow templates both execute the regression suite before semantic validation.
 
 ## AC-05 — Clear installation path
@@ -37,7 +38,7 @@
 
 ## Known failures
 
-- None. The intermediate stale-index failure was corrected and the final required workflow passed.
+- None. The intermediate stale-index failure was corrected and all later required workflows passed.
 
 ## Skipped checks
 
